@@ -403,7 +403,18 @@ function ParseBlock([string[]]$blockLines, [hashtable]$names) {
     if ($q.Count -ge 2) {
       $ar = $q[0]; $ru = $q[1]; $tr = ''
       if ($q.Count -ge 3 -and -not (HasArabic $q[1]) -and -not (HasArabic $q[2])) { $tr = $q[1]; $ru = $q[2] }
-      return [ordered]@{ ar = $ar; tr = $tr; ru = $ru; words = (MakeWords $ar) }
+      # снять markdown-выделение и вынести говорящего: '**خديجة:** текст' / 'Хадиджа: перевод'
+      $spAr = ''; $spRu = ''
+      $hadBold = $ar.TrimStart().StartsWith('**')
+      $ar = ($ar -replace '\*\*', '').Trim()
+      if ($hadBold) {
+        $mm = [regex]::Match($ar, '^([^:]{1,24}):\s*(.+)$')
+        if ($mm.Success -and (HasArabic $mm.Groups[2].Value)) { $spAr = $mm.Groups[1].Value.Trim(); $ar = $mm.Groups[2].Value.Trim() }
+      }
+      $ru = ($ru -replace '\*\*', '').Trim()
+      $mmr = [regex]::Match($ru, '^([^:]{1,24}):\s*(.+)$')
+      if ($mmr.Success -and $names.ContainsKey($mmr.Groups[1].Value.Trim())) { $spRu = $mmr.Groups[1].Value.Trim(); $ru = $mmr.Groups[2].Value.Trim() }
+      return [ordered]@{ ar = $ar; tr = $tr; ru = $ru; speakerAr = $spAr; speakerRu = $spRu; words = (MakeWords $ar) }
     }
     return $null
   }
@@ -558,6 +569,13 @@ Get-ChildItem -LiteralPath $dlgDir -Filter *.md | ForEach-Object {
       if ($n) { $names[$n] = $true }
     }
   }
+  # часть файлов вместо «**Персонажи:**» содержит участников во frontmatter («участники: Хадиджа, Марьям»)
+  if ($fm['участники']) {
+    foreach ($n in ([string]$fm['участники'] -split ',')) {
+      $n = $n.Trim()
+      if ($n) { $names[$n] = $true }
+    }
+  }
 
   # тело: '## Диалог' / '## Текст диалога' / '## Текст' / '## Вступление' + '## Текст'
   $body = Get-Section $lines @('Диалог', 'Текст диалога')
@@ -575,9 +593,48 @@ Get-ChildItem -LiteralPath $dlgDir -Filter *.md | ForEach-Object {
 
   $sents = @()
   if (-not $tableMode) {
-    foreach ($b in $blocks) {
-      $s = ParseBlock $b $names
-      if ($s) { $sents += $s }
+    # Формат «цитаты»: реплики идут парами
+    #   > **Говорящий:** арабский текст
+    #   > Говорящий: перевод
+    # и разделены ПУСТОЙ строкой (а не '---'), поэтому весь раздел — один блок,
+    # и обычный разбор взял бы лишь первую пару. Разбираем пары явно.
+    # '---' внутри секции — тоже разделитель реплик, поэтому в проверке формата его не учитываем
+    $nonEmpty = @($body | Where-Object { $_.Trim() -and $_.Trim() -ne '---' })
+    $allQuotes = $nonEmpty.Count -gt 0 -and @($nonEmpty | Where-Object { -not $_.StartsWith('>') }).Count -eq 0
+    if ($allQuotes) {
+      $q = @($nonEmpty | ForEach-Object { ($_ -replace '^>\s?', '').Trim() } | Where-Object { $_ })
+      $qi = 0
+      while ($qi -lt $q.Count) {
+        $aLine = $q[$qi]
+        if (-not (HasArabic $aLine)) { $qi++; continue }
+        # говорящий выделен жирным: '**خديجة:** текст' (маркер надёжнее, чем «короткий префикс до :»)
+        $hadBold = $aLine.TrimStart().StartsWith('**')
+        $aText = ($aLine -replace '\*\*', '').Trim()
+        $spAr = ''
+        if ($hadBold) {
+          $mm = [regex]::Match($aText, '^([^:]{1,24}):\s*(.+)$')
+          if ($mm.Success -and (HasArabic $mm.Groups[2].Value)) {
+            $spAr = $mm.Groups[1].Value.Trim(); $aText = $mm.Groups[2].Value.Trim()
+          }
+        }
+        # перевод — следующая непустая строка без арабского
+        $ru = ''; $spRu = ''
+        if (($qi + 1) -lt $q.Count -and -not (HasArabic $q[$qi + 1])) {
+          $ruText = ($q[$qi + 1] -replace '\*\*', '').Trim()
+          $mmr = [regex]::Match($ruText, '^([^:]{1,24}):\s*(.+)$')
+          if ($mmr.Success -and $names.ContainsKey($mmr.Groups[1].Value.Trim())) {
+            $spRu = $mmr.Groups[1].Value.Trim(); $ru = $mmr.Groups[2].Value.Trim()
+          } else { $ru = $ruText }
+          $qi++
+        }
+        $sents += [ordered]@{ ar = $aText; tr = ''; ru = $ru; speakerAr = $spAr; speakerRu = $spRu; words = (MakeWords $aText) }
+        $qi++
+      }
+    } else {
+      foreach ($b in $blocks) {
+        $s = ParseBlock $b $names
+        if ($s) { $sents += $s }
+      }
     }
   }
   # вариант: таблица упражнений ДЗ — «| Арабский | Перевод |» или «| Арабский | Чтение | Перевод |»
