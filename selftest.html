@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Самопроверка — Читаем арабский</title>
+<style>
+  body { font-family: "Segoe UI", system-ui, sans-serif; background: #f4f1ea; color: #2b2b2b; margin: 0; padding: 24px; line-height: 1.5; }
+  h1 { font-size: 22px; }
+  .note { font-size: 14px; color: #7a7a7a; max-width: 760px; }
+  #summary { font-size: 18px; font-weight: 700; margin: 18px 0; }
+  #summary.ok { color: #1f6f4a; }
+  #summary.bad { color: #b3261e; }
+  table { border-collapse: collapse; width: 100%; max-width: 900px; background: #fff; font-size: 14px; }
+  th, td { border: 1px solid #e3ded2; padding: 8px 12px; text-align: left; vertical-align: top; }
+  th { background: #faf8f3; }
+  td.status { width: 90px; font-weight: 700; }
+  tr.pass td.status { color: #1f6f4a; }
+  tr.fail td.status { color: #b3261e; }
+  tr.fail td { background: #fdecea; }
+  code { background: #f0ece2; border-radius: 4px; padding: 1px 5px; font-size: 13px; }
+</style>
+</head>
+<body>
+<h1>Самопроверка логики повторений</h1>
+<p class="note">
+  Страница проверяет чистую логику алгоритма интервального повторения (SM-2),
+  миграцию старого прогресса и отбор карточек в очередь на сегодня.
+  Тесты миграции и очереди выполняются на изолированных фикстурах: ваши реальные
+  данные из localStorage сохраняются и восстанавливаются автоматически.
+  После тестов просто закройте эту страницу.
+</p>
+<div id="summary">Выполняется…</div>
+<table id="results">
+  <thead><tr><th>Проверка</th><th>Статус</th><th>Детали</th></tr></thead>
+  <tbody></tbody>
+</table>
+
+<script src="js/util.js"></script>
+<script src="js/mode.js"></script>
+<script src="js/srs-core.js"></script>
+<script src="js/data.js"></script>
+<script src="js/data-juz30.js"></script>
+<script src="js/data-fatiha.js"></script>
+<script src="js/data-hadith.js"></script>
+<script src="js/data-huna.js"></script>
+<script src="js/words-core.js"></script>
+<script src="js/selftest.js"></script>
+</body>
+</html>

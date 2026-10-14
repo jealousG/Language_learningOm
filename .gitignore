@@ -1,0 +1,18 @@
+# Аудио аятов (~71 МБ, 828 файлов) — скачивается скриптом tools/download-audio.ps1
+audio/
+
+# Кэш ответов внешних API (quran.com), нужен только сборке tools/build-juz30.ps1
+tools/web-cache/
+
+# Отчёты импортёров (генерируются заново)
+tools/tokens-report.txt
+tools/missing-report.txt
+tools/huna-missing.txt
+
+# ОС / редакторы
+Thumbs.db
+Desktop.ini
+.idea/
+.vscode/
+*.tmp
+*.log

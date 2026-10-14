@@ -1,0 +1,305 @@
+﻿<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Читаем арабский — тренажёр чтения</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <div class="sticky-top">
+  <header class="topbar">
+    <div class="topbar-brand" onclick="switchTo('home')" role="button" tabindex="0" title="На главную">
+      <h1 class="logo">Читаем арабский</h1>
+      <p class="logo-sub">Коран · арабский · ежедневная практика</p>
+    </div>
+    <div class="mode-switch" role="tablist" aria-label="Режим обучения">
+      <button class="mode-btn active" data-mode="islam" role="tab" aria-selected="true" onclick="setMode('islam')">Ислам</button>
+      <button class="mode-btn" data-mode="arabic" role="tab" aria-selected="false" onclick="setMode('arabic')">Арабский язык</button>
+    </div>
+  </header>
+
+  <nav class="subnav" aria-label="Разделы">
+    <div class="subnav-inner">
+      <button class="nav-tab" data-section="home">Главная</button>
+      <button class="nav-tab" data-section="routes">Намаз</button>
+      <button class="nav-tab active" data-section="quran">Коран</button>
+      <button class="nav-tab" data-section="hadith">Хадисы</button>
+      <button class="nav-tab" data-section="stories">Истории</button>
+      <button class="nav-tab" data-section="adhkar">Азкары</button>
+      <button class="nav-tab" data-section="review">Повторить сегодня <span class="nav-badge hidden" id="srsNavBadge"></span></button>
+      <button class="nav-tab" data-section="hifz">Хифз <span class="nav-badge hidden" id="hifzNavBadge"></span></button>
+      <button class="nav-tab hidden" data-section="huna1">Хуна Арабия 1 Том</button>
+      <button class="nav-tab hidden" data-section="huna2">Хуна Арабия 2 Том</button>
+      <button class="nav-tab hidden" data-section="words">Слова</button>
+      <button class="nav-tab hidden" data-section="grammar">Грамматика</button>
+    </div>
+  </nav>
+  </div>
+
+  <!-- ЭКРАН 0: Главная — ежедневный план -->
+  <main id="screen-home" class="screen">
+    <div id="homeDashboard"></div>
+  </main>
+
+  <!-- ЭКРАН 0б: Намаз — путь понимания молитвы -->
+  <main id="screen-routes" class="screen hidden">
+    <h2 class="section-title">Намаз — понимать и заучивать молитву</h2>
+    <div id="routesDashboard"></div>
+  </main>
+
+  <!-- ЭКРАН 1: Список сур (раздел «Коран») -->
+  <main id="screen-list" class="screen">
+    <h2 class="section-title">Коран</h2>
+    <div id="storyList" class="story-grid"></div>
+  </main>
+
+  <!-- ЭКРАН 1б: Хадисы -->
+  <main id="screen-hadith" class="screen hidden">
+    <h2 class="section-title">Хадисы</h2>
+    <div id="hadithList" class="story-grid"></div>
+  </main>
+
+  <!-- ЭКРАН 1б-2: Истории -->
+  <main id="screen-stories" class="screen hidden">
+    <h2 class="section-title">Истории</h2>
+    <div id="storiesList" class="story-grid"></div>
+  </main>
+
+  <!-- ЭКРАН 1б-3: Азкары -->
+  <main id="screen-adhkar" class="screen hidden">
+    <h2 class="section-title">Азкары — поминание Аллаха</h2>
+    <div id="adhkarList" class="story-grid"></div>
+  </main>
+
+  <!-- ЭКРАН 1в: Изучение слов -->
+  <main id="screen-study" class="screen hidden">
+    <h2 class="section-title">Изучение слов</h2>
+    <div class="study-panel">
+      <div id="studySetup">
+        <label class="study-label">Источник слов</label>
+        <select id="studySource" class="study-select"></select>
+        <div id="studyFormatRow" class="hidden">
+          <label class="study-label">Формат</label>
+          <select id="studyFormat" class="study-select">
+            <option value="choice">Выбор из вариантов</option>
+            <option value="cards">Флеш-карточки (самооценка)</option>
+          </select>
+        </div>
+        <button id="studyStartBtn" class="ctrl-btn primary wide">Начать</button>
+        <p class="study-hint">Выбирайте правильный вариант из нескольких. Пять верных ответов подряд — слово считается выученным и больше не встречается в тренировке (остаётся в разделе «Повторить сегодня»). Сессия — не более 20 вопросов; каждые 5 слов — сборка аята из слов.</p>
+      </div>
+      <div id="studyGame" class="hidden">
+        <div class="study-top">
+          <div class="study-top-info">
+            <div id="studySourceName" class="study-source-name"></div>
+            <div class="study-progress">
+              <span id="studyProgressText"></span>
+              <span id="studyScoreText"></span>
+            </div>
+          </div>
+          <button class="study-exit" id="studyExitBtn" title="Прервать тренировку">✕ Прервать</button>
+        </div>
+        <div id="studyStage"></div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ЭКРАН 1г: Повторить сегодня (интервальное повторение) -->
+  <main id="screen-review" class="screen hidden">
+    <h2 class="section-title">Повторить сегодня</h2>
+    <div class="study-panel" id="srsOverviewPanel"></div>
+    <div class="study-panel hidden" id="srsSessionPanel">
+      <div class="study-progress">
+        <span id="srsProgressText"></span>
+        <button class="study-exit" id="srsExitBtn" title="Прервать повторение">✕ Прервать</button>
+        <span id="srsScoreText"></span>
+      </div>
+      <div id="srsStage"></div>
+    </div>
+  </main>
+
+  <!-- ЭКРАН 1д: Хифз — заучивание Корана -->
+  <main id="screen-hifz" class="screen hidden">
+    <h2 class="section-title">Хифз — заучивание Корана</h2>
+    <div class="study-panel" id="hifzSetupPanel">
+      <h3 class="study-panel-title">Выбор аятов и режима</h3>
+      <div id="hifzSetupForm"></div>
+    </div>
+    <div class="study-panel" id="hifzOverviewPanel">
+      <h3 class="study-panel-title">Мой хифз</h3>
+      <div id="hifzDashboard"></div>
+    </div>
+    <div class="study-panel hidden" id="hifzSessionPanel">
+      <div class="study-progress">
+        <span id="hifzProgressText"></span>
+        <button class="study-exit" id="hifzExitBtn" title="Выйти из сессии">✕ Выйти</button>
+        <span id="hifzScoreText"></span>
+      </div>
+      <div id="hifzStage"></div>
+    </div>
+  </main>
+
+  <!-- ЭКРАН 1е: Хуна Арабия — Том 1 -->
+  <main id="screen-huna1" class="screen hidden">
+    <h2 class="section-title">Хуна Арабия — Том 1</h2>
+    <div id="huna1List" class="book-list"></div>
+  </main>
+
+  <!-- ЭКРАН 1е-2: Хуна Арабия — Том 2 -->
+  <main id="screen-huna2" class="screen hidden">
+    <h2 class="section-title">Хуна Арабия — Том 2</h2>
+    <div id="huna2List" class="book-list"></div>
+  </main>
+
+  <!-- ЭКРАН 1е-3: Грамматика -->
+  <main id="screen-grammar" class="screen hidden">
+    <h2 class="section-title">Грамматика</h2>
+    <div class="words-bar">
+      <button type="button" class="fold-all-btn" id="grammarFoldAll">Развернуть все</button>
+    </div>
+    <div id="grammarList" class="grammar-groups"></div>
+  </main>
+
+  <!-- ЭКРАН 1е-4: Заметка грамматики -->
+  <main id="screen-grammar-note" class="screen hidden">
+    <button class="back-btn" id="grammarBackBtn">← К списку грамматики</button>
+    <h2 id="grammarNoteTitle" class="story-title-ru"></h2>
+    <div id="grammarNoteBody" class="grammar-body"></div>
+  </main>
+
+  <!-- ЭКРАН 1е-5: Слова (Том → Глава → слова со статусом изучения) -->
+  <main id="screen-words" class="screen hidden">
+    <h2 class="section-title">Слова</h2>
+    <div class="words-bar">
+      <div class="words-books" id="wordsBooks" role="tablist" aria-label="Том"></div>
+      <input id="wordsSearch" class="words-search" type="search" placeholder="Поиск слова или перевода…" aria-label="Поиск слова">
+      <div class="words-filters" id="wordsFilters"></div>
+      <button type="button" class="fold-all-btn" id="wordsFoldAll">Развернуть все</button>
+    </div>
+    <div id="wordsSummary" class="words-summary"></div>
+    <div id="wordsBody" class="words-body"></div>
+  </main>
+
+  <!-- ЭКРАН 2: Чтение истории -->
+  <main id="screen-reader" class="screen hidden">
+    <button class="back-btn" id="readerBackBtn" onclick="goHome()">← К списку историй</button>
+    <h2 id="storyTitleAr" class="story-title-ar"></h2>
+    <h3 id="storyTitleRu" class="story-title-ru"></h3>
+    <div id="storyIntro" class="story-intro hidden"></div>
+
+    <div class="harakat-controls" id="harakatControls">
+      <span class="hc-label">Огласовки:</span>
+      <button class="hc-btn" data-h="full" title="Оригинальный текст с полными огласовками">полные</button>
+      <button class="hc-btn" data-h="partial" title="Видны только шадда и сукун — падежные окончания скрыты">частичные</button>
+      <button class="hc-btn" data-h="none" title="Текст без огласовок — тренировка чтения">без огласовок</button>
+    </div>
+
+    <div class="player-bar">
+      <button id="btnRewind" class="player-btn" title="Назад на 5 секунд" aria-label="Назад на 5 секунд">−5с</button>
+      <button id="btnPlayPause" class="player-btn primary" title="Воспроизвести или приостановить" aria-label="Воспроизвести или приостановить">▶</button>
+      <button id="btnStop" class="player-btn" title="Остановить" aria-label="Остановить воспроизведение">■</button>
+      <button id="btnForward" class="player-btn" title="Вперёд на 5 секунд" aria-label="Вперёд на 5 секунд">+5с</button>
+      <div class="player-time">
+        <span id="timeCurrent">0:00</span>
+        <input type="range" id="seekBar" min="0" max="100" value="0" step="0.1">
+        <span id="timeTotal">0:00</span>
+      </div>
+      <label class="speed-control reciter-control">
+        Чтец:
+        <select id="reciterSelect"></select>
+      </label>
+      <label class="speed-control">
+        Скорость:
+        <select id="speedSelect">
+          <option value="0.75">0.75×</option>
+          <option value="1" selected>1×</option>
+          <option value="1.25">1.25×</option>
+        </select>
+      </label>
+    </div>
+    <audio id="audioPlayer" preload="none"></audio>
+
+    <div id="playerStatus" class="recognition-status hidden"></div>
+
+    <div class="basmala-block">
+      <div class="basmala-ar" id="basmalaAr" lang="ar" dir="rtl"></div>
+      <div class="basmala-ru" id="basmalaRu"></div>
+    </div>
+
+    <div id="storyText" class="story-text"></div>
+
+    <div id="surahNav" class="surah-nav hidden"></div>
+
+    <div id="readerStudy" class="reader-study"></div>
+
+    <div class="legend">
+      <span class="legend-item"><span class="dot dot-new"></span> новое слово</span>
+      <span class="legend-item"><span class="dot dot-seen"></span> наведено курсором</span>
+      <span class="legend-item"><span class="dot dot-known"></span> изучено (клик)</span>
+      <span class="legend-item"><span class="dot dot-speaking"></span> сейчас звучит</span>
+    </div>
+
+    <div class="rec-panel">
+      <div class="rec-buttons">
+        <button class="ctrl-btn small" id="recToggleBtn">Записать моё чтение</button>
+        <button class="ctrl-btn small hidden" id="recPlayBtn">▶ Прослушать себя</button>
+        <button class="ctrl-btn small hidden" id="recDeleteBtn">Удалить запись</button>
+      </div>
+      <span id="recStatus" class="rec-status"></span>
+      <p class="rec-hint">Запись остаётся только на вашем устройстве и никуда не отправляется. Это не проверка правильности чтения или таджвида — только возможность услышать себя и сравнить с чтецом.</p>
+    </div>
+  </main>
+
+  <!-- Карточка слова -->
+  <div id="wordCard" class="word-card hidden" role="dialog" aria-modal="true" aria-label="Карточка слова">
+    <button class="word-card-close" onclick="closeWordCard()" aria-label="Закрыть карточку слова">✕</button>
+    <div class="word-card-ar" id="wcAr" lang="ar" dir="rtl"></div>
+    <div class="word-card-tr" id="wcTr"></div>
+    <div class="word-card-row"><span class="label">Перевод:</span> <span id="wcRu"></span></div>
+    <div class="word-card-row"><span class="label">Часть речи:</span> <span id="wcPos"></span></div>
+    <div class="word-card-row"><span class="label">Корень:</span> <span id="wcRoot" class="arabic-inline"></span></div>
+    <div class="word-card-row"><span class="label">Повторение:</span> <span id="wcSrs">—</span></div>
+    <div class="word-card-row def"><span class="label">Объяснение:</span> <span id="wcDef"></span></div>
+    <div class="word-card-actions">
+      <button class="ctrl-btn small primary" id="wcSrsAction">Добавить в повторение</button>
+      <button class="ctrl-btn small hidden" id="wcOccBtn"></button>
+      <button class="ctrl-btn small hidden" id="wcRootBtn">Слова с этим корнем</button>
+      <button class="ctrl-btn small" id="wcPlayBtn">Прослушать слово</button>
+    </div>
+  </div>
+
+  <!-- Модальный список (вхождения слова / слова с корнем) -->
+  <div id="listModal" class="word-card list-modal hidden" role="dialog" aria-modal="true" aria-label="Список">
+    <button class="word-card-close" onclick="closeListModal()" aria-label="Закрыть список">✕</button>
+    <h3 class="lm-title" id="lmTitle" lang="ar" dir="rtl"></h3>
+    <p class="lm-note" id="lmNote"></p>
+    <div class="lm-body" id="lmBody"></div>
+  </div>
+  <div id="overlay" class="overlay hidden" onclick="closeWordCard()"></div>
+
+  <!-- Легковесная подсказка при наведении -->
+  <div id="tooltip" class="tooltip hidden"></div>
+
+  <script src="js/data.js"></script>
+  <script src="js/data-juz30.js"></script>
+  <script src="js/data-fatiha.js"></script>
+  <script src="js/data-hadith.js"></script>
+  <script src="js/data-namaz.js"></script>
+  <script src="js/data-vault.js"></script>
+  <script src="js/data-vault-words.js"></script>
+  <script src="js/data-adhkar.js"></script>
+  <script src="js/data-huna.js"></script>
+  <script src="js/util.js"></script>
+  <script src="js/mode.js"></script>
+<script src="js/srs-core.js"></script>
+<script src="js/words-core.js"></script>
+<script src="js/word-index.js"></script>
+  <script src="js/srs.js"></script>
+  <script src="js/hifz.js"></script>
+  <script src="js/dashboard.js"></script>
+  <script src="js/routes.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
