@@ -9,6 +9,9 @@ tools/tokens-report.txt
 tools/missing-report.txt
 tools/huna-missing.txt
 
+# Временные файлы аудита/выгрузок (tools/_*.txt)
+tools/_*
+
 # ОС / редакторы
 Thumbs.db
 Desktop.ini

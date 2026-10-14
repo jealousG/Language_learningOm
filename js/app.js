@@ -1544,6 +1544,9 @@ function playFromAyah(sIdx) {
 
 function playPlayer() {
   if (!playlist.length || !playerAudio) return;
+  // один аудиопоток: перед стартом аятов глушим слово и Хифз
+  stopWordAudio();
+  if (typeof HIFZ !== 'undefined') HIFZ.stop();
   wantPlaying = true;
   if (!playerAudio.src) {
     loadAyah(0, 0);
