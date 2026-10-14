@@ -344,10 +344,43 @@ function CutLetters([string]$s, [int]$n) {
 }
 
 # Слово строки: разбивает по пробелам, отделяет пунктуацию, находит словарную статью
+# ﷺ (U+FDFA) и числа, включая ссылки вида «(96:1-5)», — отдельные «слова».
+# Без этого они выпадали из разбора (ﷺ вне диапазона \u0600-\u06FF, цифры снимает Norm),
+# и склейка words[].w не совпадала с текстом ar.
+function SpecialWord([string]$tok) {
+  # снимаем обрамляющую пунктуацию, включая арабскую: ، ؛ ؟ ۔
+  $core = $tok.Trim('«', '»', '"', "'", '(', ')', '.', ',', ';', ':', '!', '?', '—', '–', '-', '…',
+                    [char]0x060C, [char]0x061B, [char]0x061F, [char]0x06D4)
+  if (-not $core) { return $null }
+  $hasFdfa = $core.Contains([char]0xFDFA)
+  $hasDigit = [bool]([regex]::IsMatch($core, '[\d\u0660-\u0669]'))
+  if (-not ($hasFdfa -or $hasDigit)) { return $null }
+  # ﷺ
+  if ($core -eq [string][char]0xFDFA) {
+    return [ordered]@{ w = $core; tr = 'саллаллаху алейхи ва саллям'; ru = 'да благословит его Аллах и приветствует'; pos = 'формула' }
+  }
+  # ссылка на аят: (96:1-5), (29:8), (66:6)
+  if ($core -match '^\(?\s*\d+\s*[:.\-]\s*[\d\-]+\s*\)?$') {
+    return [ordered]@{ w = $core; tr = ''; ru = "аят $core"; pos = 'ссылка на аят' }
+  }
+  # число (арабо-индийские цифры переводим в привычные)
+  if ($core -match '^[\d\u0660-\u0669]+$') {
+    $n = ''
+    foreach ($ch in $core.ToCharArray()) {
+      $code = [int]$ch
+      if ($code -ge 0x0660 -and $code -le 0x0669) { $n += [string]($code - 0x0660) } else { $n += [string]$ch }
+    }
+    return [ordered]@{ w = $core; tr = $n; ru = $n; pos = 'числ.' }
+  }
+  return $null
+}
+
 function MakeWords([string]$text) {
   $words = @()
   foreach ($tok in ($text -split '\s+')) {
     if (-not $tok) { continue }
+    $sp = SpecialWord $tok
+    if ($sp) { $words += $sp; continue }
     $lead = ''
     $trail = ''
     $mm = [regex]::Match($tok, '^([^\u0600-\u06FF]*)(.*?)([^\u0600-\u06FF]*)$')
