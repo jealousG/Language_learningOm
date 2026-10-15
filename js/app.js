@@ -757,7 +757,21 @@ function renderWordsList() {
     return { ch, entries, st };
   });
 
+  // «Оживающая рукопись»: весь том как лист, подсвечиваемый золотом
+  const bookPct = totals.all ? Math.round(totals.learned / totals.all * 100) : 0;
+  const doneChapters = chapters.filter(c => c.st.all > 0 && c.st.learned >= c.st.all).length;
+
   summary.innerHTML =
+    `<div class="ms-book">
+      <div class="ms-book-top">
+        <span class="ms-book-label">Рукопись тома</span>
+        <span class="ms-book-pct">${bookPct}%</span>
+      </div>
+      <div class="ms-book-bar" role="img" aria-label="Рукопись тома заполнена на ${bookPct}%">
+        <div class="ms-book-fill" style="width:${bookPct}%"></div>
+      </div>
+      <span class="ms-book-note">завершено глав: ${doneChapters} из ${chapters.length} · каждое выученное слово проявляет строку</span>
+    </div>` +
     `<span class="words-sum ws-learned">Выучено: ${totals.learned}</span>` +
     `<span class="words-sum ws-learning">Учу: ${totals.learning}</span>` +
     `<span class="words-sum ws-new">Не начато: ${totals.new}</span>` +
@@ -783,8 +797,13 @@ function renderWordsList() {
 
     const folded = !forceOpen && !wordsOpen.has(ch.id);
 
+    // лист главы: штрихи-«слова» подсвечиваются золотом по мере выучивания
+    const chPct = st.all ? Math.round(st.learned / st.all * 100) : 0;
+    const chDashes = manuscriptDashes(st.learned, st.all, 10);
+    const chComplete = st.all > 0 && st.learned >= st.all;
+
     const wrap = document.createElement('section');
-    wrap.className = 'words-chapter' + (folded ? ' folded' : '');
+    wrap.className = 'words-chapter' + (folded ? ' folded' : '') + (chComplete ? ' ms-complete' : '');
 
     const head = document.createElement('button');
     head.type = 'button';
@@ -795,7 +814,10 @@ function renderWordsList() {
       `<span class="words-chapter-name">Глава ${ch.no}. ${escapeHtml(ch.titleRu || '')}` +
         (ch.titleAr ? ` <span class="book-chapter-ar" lang="ar" dir="rtl">${escapeHtml(ch.titleAr)}</span>` : '') +
       `</span>` +
-      `<span class="words-chapter-stat">${st.learned} / ${st.all} выучено</span>`;
+      `<span class="ms-leaf" role="img" aria-label="Рукопись главы: ${chPct}%">` +
+        Array.from({ length: 10 }, (_, i) => `<i${i < chDashes ? ' class="on"' : ''}></i>`).join('') +
+      `</span>` +
+      `<span class="words-chapter-stat">${st.learned} / ${st.all} · ${chComplete ? 'лист завершён' : chPct + '%'}</span>`;
 
     const panel = document.createElement('div');
     panel.className = 'words-chapter-panel' + (folded ? ' hidden' : '');

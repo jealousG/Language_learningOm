@@ -1545,6 +1545,50 @@ summary:focus-visible, [tabindex]:focus-visible {
   color: var(--ink-muted);
   font-weight: 400;
 }
+
+/* «Оживающая рукопись»: лист главы подсвечивается золотом по мере выучивания слов */
+.ms-leaf {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 2.5px;
+  padding: 4px 7px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--card);
+}
+.ms-leaf i {
+  display: block;
+  width: 7px; height: 3px;
+  border-radius: 1.5px;
+  background: var(--paper-deep);
+  transition: background .3s ease;
+}
+/* штрихи разной ширины — как строка рукописи */
+.ms-leaf i:nth-child(3n) { width: 10px; }
+.ms-leaf i:nth-child(4n+1) { width: 5px; }
+.ms-leaf i.on { background: var(--gold); }
+/* глава полностью выучена — лист «завершён» */
+.words-chapter.ms-complete .words-chapter-title {
+  background: var(--gold-soft);
+  border-color: var(--gold);
+}
+.words-chapter.ms-complete .words-chapter-title:hover { background: #eedcae; }
+.words-chapter.ms-complete .words-caret { color: var(--gold); }
+.words-chapter.ms-complete .ms-leaf { border-color: var(--gold); background: #fdf8ec; }
+
+/* рукопись тома: сводка над списком глав */
+.ms-book { flex: 1 0 100%; margin: 2px 0 4px; }
+.ms-book-top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+.ms-book-label { font-family: var(--font-serif); font-size: 15px; font-weight: 600; color: var(--gold); }
+.ms-book-pct { font-family: var(--font-ui); font-size: 13px; color: var(--ink-muted); }
+.ms-book-bar { height: 5px; border-radius: 2.5px; background: var(--paper-deep); overflow: hidden; }
+.ms-book-fill {
+  height: 100%; border-radius: 2.5px;
+  background: linear-gradient(90deg, #d8b25e, var(--gold));
+  transition: width .5s ease;
+}
+.ms-book-note { display: block; margin-top: 5px; font-size: 11.5px; color: var(--ink-muted); }
 .fold-all-btn {
   font-family: var(--font-ui);
   font-size: 13px;

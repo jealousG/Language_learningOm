@@ -151,3 +151,15 @@ function resolveStudySource(sourceId) {
   if (typeof STORIES_DATA === 'undefined') return null;
   return STORIES_DATA.stories.find(s => s.id === sourceId) || null;
 }
+
+/**
+ * «Оживающая рукопись»: сколько сегментов-«слов» на листе главы подсвечено
+ * золотом. Доля выученных слов → количество горящих штрихов (с округлением),
+ * 0 при пустой главе, потолок — segments.
+ */
+function manuscriptDashes(learned, all, segments) {
+  if (!segments || segments <= 0) return 0;
+  if (!all || all <= 0 || learned <= 0) return 0;
+  const n = Math.round((learned / all) * segments);
+  return Math.max(0, Math.min(segments, n));
+}

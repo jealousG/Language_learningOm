@@ -344,6 +344,19 @@
       const generalIdx = groups.findIndex(g => g.no === 0);
       eq('grammarGroups: «Общее» идёт последним', generalIdx, generalIdx < 0 ? -1 : groups.length - 1);
     }
+
+    // «Оживающая рукопись»: подсветка штрихов листа
+    if (typeof manuscriptDashes === 'function') {
+      eq('manuscriptDashes: 0 из 100 → 0 штрихов', manuscriptDashes(0, 100, 10), 0);
+      eq('manuscriptDashes: 50 из 100 → 5', manuscriptDashes(50, 100, 10), 5);
+      eq('manuscriptDashes: 100 из 100 → все 10', manuscriptDashes(100, 100, 10), 10);
+      eq('manuscriptDashes: 8 из 185 → 0 (округление вниз)', manuscriptDashes(8, 185, 10), 0);
+      eq('manuscriptDashes: 19 из 185 → 1', manuscriptDashes(19, 185, 10), 1);
+      eq('manuscriptDashes: пустая глава → 0', manuscriptDashes(0, 0, 10), 0);
+      eq('manuscriptDashes: потолок при переполнении', manuscriptDashes(120, 100, 10), 10);
+      eq('manuscriptDashes: ноль сегментов → 0', manuscriptDashes(50, 100, 0), 0);
+      eq('manuscriptDashes: 95 из 100 → 10 (округление к ближайшему)', manuscriptDashes(95, 100, 10), 10);
+    }
   }
 
   // ================= Часть 3: золотые чернила =================
