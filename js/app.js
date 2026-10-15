@@ -1364,13 +1364,101 @@ function restoreModalFocus() {
 }
 
 function closeWordCard() {
-  const anyModalOpen = !document.getElementById('wordCard').classList.contains('hidden')
-    || !document.getElementById('listModal').classList.contains('hidden');
+  const isOpen = (id) => {
+    const el = document.getElementById(id);
+    return !!el && !el.classList.contains('hidden');
+  };
+  const anyModalOpen = isOpen('wordCard') || isOpen('listModal') || isOpen('levelsModal');
   document.getElementById('wordCard').classList.add('hidden');
+  const lv = document.getElementById('levelsModal');
+  if (lv) lv.classList.add('hidden');
   document.getElementById('overlay').classList.add('hidden');
   closeListModal();
   stopWordAudio();
   if (anyModalOpen) restoreModalFocus();
+}
+
+// ------------------------- Окно «Уровни и чернила» -------------------------
+
+/** Открыть окно уровней (можно с фокусом на разделе). */
+function openLevelsModal(sectionId) {
+  if (typeof INK === 'undefined') return;
+  const el = document.getElementById('levelsModal');
+  if (!el) return;
+  renderLevelsModal(sectionId);
+  el.classList.remove('hidden');
+  document.getElementById('overlay').classList.remove('hidden');
+  focusModal(el);
+}
+
+function closeLevelsModal() {
+  const el = document.getElementById('levelsModal');
+  if (el) el.classList.add('hidden');
+  const anyOpen = ['wordCard', 'listModal'].some(id => {
+    const m = document.getElementById(id);
+    return !!m && !m.classList.contains('hidden');
+  });
+  const overlay = document.getElementById('overlay');
+  if (!anyOpen && overlay) overlay.classList.add('hidden');
+  restoreModalFocus();
+}
+
+/** Содержимое окна: правила начисления, разделы с уровнями, лестница уровней. */
+function renderLevelsModal(focusSection) {
+  const body = document.getElementById('levelsBody');
+  if (!body) return;
+  const P = INK.P;
+
+  const rules = [
+    ['Верный ответ', '+' + P.correct],
+    ['Серия из ' + P.comboEvery + ' верных подряд', '+' + P.comboBonus],
+    ['Выученное слово', '+' + P.learned],
+    ['Сборка аята без ошибок', '+' + P.build],
+    ['Завершённая сессия', '+' + P.session],
+    ['Аят хифза (не «Не помню»)', '+' + P.ayah]
+  ];
+
+  const rulesHtml = `<div class="lv-rules">
+      <h4 class="lv-h">Как копятся чернила</h4>
+      <div class="lv-rules-grid">
+        ${rules.map(([t, v]) => `<div class="lv-rule"><span class="lv-rule-t">${escapeHtml(t)}</span><span class="lv-rule-v">${v}</span></div>`).join('')}
+      </div>
+      <p class="lv-note">Чернила не тратятся: это мера практики. В каждом разделе свой счёт и свой уровень.</p>
+    </div>`;
+
+  const groups = INK.breakdown();
+  const sectionsHtml = groups.map(g => `
+    <div class="lv-group">
+      <h4 class="lv-h">${escapeHtml(g.title)}</h4>
+      ${g.sections.map(s => `
+        <div class="lv-row${s.id === focusSection ? ' lv-row-focus' : ''}">
+          <span class="lv-sec">${escapeHtml(s.label)}</span>
+          <span class="lv-level">${escapeHtml(s.level.name)}</span>
+          <span class="lv-ink">${s.ink}</span>
+          <div class="lv-bar"><div class="lv-fill" style="width:${s.level.pct}%"></div></div>
+          <span class="lv-next">${s.level.nextName ? 'до «' + escapeHtml(s.level.nextName) + '»: ' + s.level.toNext : 'высший уровень'}</span>
+        </div>`).join('')}
+    </div>`).join('');
+
+  const legacyInk = INK.legacy();
+  const legacyHtml = legacyInk > 0
+    ? `<p class="lv-note">Ранее накоплено (до разделения по разделам): <b>${legacyInk}</b>.</p>`
+    : '';
+
+  // лестница уровней: подсвечиваем уровень выбранного раздела (или общий)
+  const refInk = focusSection ? INK.inkOf(focusSection) : INK.total();
+  const refIndex = INK.levelIndex(refInk);
+  const ladderHtml = `<div class="lv-ladder">
+      <h4 class="lv-h">Лестница уровней</h4>
+      ${INK.LEVELS.map((l, i) => `
+        <div class="lv-step${i === refIndex ? ' lv-step-now' : ''}">
+          <span class="lv-step-no">${i + 1}</span>
+          <span class="lv-step-name">${escapeHtml(l.name)}</span>
+          <span class="lv-step-min">${l.min} чернил</span>
+        </div>`).join('')}
+    </div>`;
+
+  body.innerHTML = rulesHtml + `<div class="lv-sections">${sectionsHtml}</div>` + ladderHtml + legacyHtml;
 }
 
 // ------------------------- Аудио отдельного слова -------------------------
@@ -1853,7 +1941,7 @@ function renderStudyDashboard() {
   }).join('');
 
   const accuracy = totalAnswers ? Math.round(correctAnswers / totalAnswers * 100) : 0;
-  const inkLi = (typeof INK !== 'undefined') ? INK.levelInfo() : null;
+  const inkTotal = (typeof INK !== 'undefined') ? INK.total() : 0;
 
   const hardHtml = hard.length
     ? hard.slice(0, 8).map(({ text, e }) => `
@@ -1870,12 +1958,15 @@ function renderStudyDashboard() {
       <div class="stat-box"><div class="stat-num">${solid}</div><div class="stat-label">закреплено (в повторении)</div></div>
       <div class="stat-box"><div class="stat-num">${learnedWordsCount()}</div><div class="stat-label">выучено (5 верных подряд)</div></div>
       <div class="stat-box"><div class="stat-num">${totalAnswers ? accuracy + '%' : '—'}</div><div class="stat-label">точность ответов</div></div>
-      ${inkLi ? `<div class="stat-box ink-box"><div class="stat-num">${INK.total()}</div><div class="stat-label">золотых чернил · ${escapeHtml(inkLi.name)}</div></div>` : ''}
+      ${typeof INK !== 'undefined' ? `<button type="button" class="stat-box ink-box" id="inkTotalBox"><div class="stat-num">${inkTotal}</div><div class="stat-label">золотых чернил всего · уровни</div></button>` : ''}
     </div>
     ${sectionsHtml}
     <p class="stats-legend">Полоса: <span class="seg-demo start"></span> взято в изучение · <span class="seg-demo solid"></span> закреплено (периодическое повторение)</p>
     <h4 class="stats-subtitle">Самые сложные слова</h4>
     <div class="hard-words">${hardHtml}</div>`;
+
+  const inkBox = document.getElementById('inkTotalBox');
+  if (inkBox) inkBox.addEventListener('click', () => openLevelsModal());
 }
 
 // ------------------------- Типы заданий -------------------------
@@ -2032,7 +2123,7 @@ function newWordsPool() {
       seen.add(w.w);
       if (isWordLearned(w.w)) return;
       const e = stats[w.w];
-      items.push({ word: w, sentence: sent, gapIndex: i, seenBefore: !!e, streak: (e && e.streak) || 0 });
+      items.push({ word: w, sentence: sent, gapIndex: i, story: s, seenBefore: !!e, streak: (e && e.streak) || 0 });
     })));
   // ни разу не встречавшиеся — вперёд; затем по возрастанию серии верных ответов
   items.sort((a, b) => (a.seenBefore - b.seenBefore) || (a.streak - b.streak));
@@ -2091,34 +2182,35 @@ function startStudy() {
   let questions;
   if (cardMode) {
     // флеш-карточки: без вариантов, с самооценкой («знаю / не знаю»)
-    questions = chosen.map(item => ({ kind: 'card', word: item.word, sentence: item.sentence, gapIndex: item.gapIndex }));
+    questions = chosen.map(item => ({ kind: 'card', word: item.word, sentence: item.sentence, gapIndex: item.gapIndex, story: item.story || story }));
   } else {
     let prevType = null;
     const wordQs = shuffle(chosen).map(item => {
       const type = pickType(item, prevType);
       prevType = type;
-      return { kind: 'word', word: item.word, sentence: item.sentence, gapIndex: item.gapIndex, type };
+      return { kind: 'word', word: item.word, sentence: item.sentence, gapIndex: item.gapIndex, type, story: item.story || story };
     });
 
     // предложения для сборки: из выбранных слов (новые) или все предложения текста
-    let sentencePool;
+    let sentenceItems;
     if (isNew) {
       const seenS = new Set();
-      sentencePool = [];
+      sentenceItems = [];
       wordQs.forEach(q => {
-        if (q.sentence && !seenS.has(q.sentence)) { seenS.add(q.sentence); sentencePool.push(q.sentence); }
+        if (q.sentence && !seenS.has(q.sentence)) { seenS.add(q.sentence); sentenceItems.push({ sentence: q.sentence, story: q.story }); }
       });
     } else {
-      sentencePool = shuffle(story.sentences);
+      sentenceItems = shuffle(story.sentences).map(s => ({ sentence: s, story }));
     }
-    const buildCount = Math.min(sentencePool.length, maxBuilds);
+    const buildCount = Math.min(sentenceItems.length, maxBuilds);
 
     questions = [];
     let si = 0;
     wordQs.forEach((q, i) => {
       questions.push(q);
       if (buildCount && (i + 1) % STUDY_BUILD_EVERY === 0 && si < buildCount) {
-        questions.push({ kind: 'build', sentence: sentencePool[si++] });
+        const bi = sentenceItems[si++];
+        questions.push({ kind: 'build', sentence: bi.sentence, story: bi.story });
       }
     });
   }
@@ -2128,6 +2220,14 @@ function startStudy() {
   document.getElementById('studySetup').classList.add('hidden');
   document.getElementById('studyGame').classList.remove('hidden');
   renderStudyQuestion();
+}
+
+/** Раздел для начисления чернил по заданию тренажёра. */
+function inkSectionForQuestion(q) {
+  if (typeof INK === 'undefined') return null;
+  if (q && q.story) return INK.sectionForStory(q.story);
+  if (study && study.story) return INK.sectionForStory(study.story);
+  return null;
 }
 
 function updateStudyProgress() {
@@ -2144,7 +2244,7 @@ function renderStudyQuestion() {
   const q = study.questions[study.idx];
 
   if (q.kind === 'build') {
-    renderBuilder(q.sentence);
+    renderBuilder(q.sentence, q.story);
     scrollToStudyTop();
     return;
   }
@@ -2209,7 +2309,7 @@ function answerCard(q, ok) {
   if (ok) study.score++; else { study.wrong++; addMissed(q.word); }
   document.getElementById('studyScoreText').textContent = `✅ ${study.score}`;
   const streak = recordStudyAnswer(q.word.w, ok);
-  inkAnswer(ok, streak, registerLearned(q.word.w, streak));
+  inkAnswer(ok, streak, registerLearned(q.word.w, streak), inkSectionForQuestion(q));
 
   const lim = learnStreak();
   const fb = document.createElement('div');
@@ -2375,7 +2475,7 @@ function answerExercise(q, i, options, correct, clickedBtn, allBtns) {
 
   // запись результата: SRS-расписание + статистика + серия верных ответов
   const streak = recordStudyAnswer(q.word.w, ok);
-  inkAnswer(ok, streak, registerLearned(q.word.w, streak));
+  inkAnswer(ok, streak, registerLearned(q.word.w, streak), inkSectionForQuestion(q));
   showExerciseResult(q, ok, streak);
 }
 
@@ -2389,12 +2489,12 @@ function registerLearned(text, streak) {
 }
 
 /** Золотые чернила за ответ тренажёра: верный ответ + серия + выученное слово. */
-function inkAnswer(ok, streak, newlyLearned) {
+function inkAnswer(ok, streak, newlyLearned, section) {
   if (typeof INK === 'undefined') return;
   study.combo = ok ? (study.combo || 0) + 1 : 0;
-  if (ok) INK.add(INK.P.correct);
-  if (study.combo > 0 && study.combo % INK.P.comboEvery === 0) INK.add(INK.P.comboBonus);
-  if (newlyLearned) INK.add(INK.P.learned);
+  if (ok) INK.add(INK.P.correct, section);
+  if (study.combo > 0 && study.combo % INK.P.comboEvery === 0) INK.add(INK.P.comboBonus, section);
+  if (newlyLearned) INK.add(INK.P.learned, section);
 }
 
 /** Единая точка результата в тренажёре: SRS + статистика + серия верных ответов. */
@@ -2514,7 +2614,11 @@ function renderStudyEnd() {
   const stage = document.getElementById('studyStage');
   // завершённая тренировка — учебный день (журнал активности) + чернила за сессию
   if (typeof logActivity === 'function') logActivity({ trainings: 1 });
-  if (typeof INK !== 'undefined') INK.add(INK.P.session);
+  if (typeof INK !== 'undefined') {
+    const sec = INK.dominantSection((study.questions || []).map(q => inkSectionForQuestion(q)))
+      || (study.story ? INK.sectionForStory(study.story) : null);
+    INK.add(INK.P.session, sec);
+  }
   const missed = study.missed || [];
   const missedHtml = missed.length ? `
       <div class="study-missed">
@@ -2547,7 +2651,7 @@ function renderInkEarned() {
 }
 
 /** Режим «собери аят / фразу»: слова в разброс, собираем порядок кликами. */
-function renderBuilder(sentence) {
+function renderBuilder(sentence, sentenceStory) {
   const stage = document.getElementById('studyStage');
   const n = sentence.words.length;
   const indices = sentence.words.map((_, i) => i);
@@ -2615,9 +2719,10 @@ function renderBuilder(sentence) {
     document.getElementById('studyScoreText').textContent = `✅ ${study.score}`;
     // золотые чернила: сборка — сложнее обычного ответа
     if (typeof INK !== 'undefined') {
+      const sec = inkSectionForQuestion({ story: sentenceStory });
       study.combo = ok ? (study.combo || 0) + 1 : 0;
-      if (ok) INK.add(INK.P.correct + INK.P.build);
-      if (study.combo > 0 && study.combo % INK.P.comboEvery === 0) INK.add(INK.P.comboBonus);
+      if (ok) INK.add(INK.P.correct + INK.P.build, sec);
+      if (study.combo > 0 && study.combo % INK.P.comboEvery === 0) INK.add(INK.P.comboBonus, sec);
     }
 
     // После сборки: перевод + озвучка (если есть) + «Дальше»
@@ -2642,7 +2747,7 @@ function renderBuilder(sentence) {
 
   document.getElementById('bReset').addEventListener('click', () => {
     if (study.locked) return;
-    renderBuilder(sentence);
+    renderBuilder(sentence, sentenceStory);
   });
 }
 
@@ -2821,7 +2926,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
     if (e.key !== 'Tab') return;
-    const modals = ['wordCard', 'listModal']
+    const modals = ['wordCard', 'listModal', 'levelsModal']
       .map(id => document.getElementById(id))
       .filter(m => m && !m.classList.contains('hidden'));
     if (!modals.length) return;

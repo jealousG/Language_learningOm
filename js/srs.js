@@ -307,7 +307,11 @@ const SRS = (() => {
     const s = session.stats;
     const done = session.queue.length;
     const remaining = counts().due;
-    if (typeof INK !== 'undefined') INK.add(INK.P.session); // чернила за завершённую сессию
+    if (typeof INK !== 'undefined') {
+      // бонус за сессию — в самый частый раздел сессии
+      const sec = INK.dominantSection((session.queue || []).map(inkSectionForWord));
+      INK.add(INK.P.session, sec);
+    }
     const inkEarned = (typeof INK !== 'undefined') ? INK.sinceMark() : 0;
     const stage = document.getElementById('srsStage');
     stage.innerHTML = `
@@ -417,6 +421,13 @@ const SRS = (() => {
     }
   }
 
+  /** Раздел чернил по слову (по тексту-источнику). */
+  function inkSectionForWord(text) {
+    if (typeof INK === 'undefined') return null;
+    const info = corpus.map.get(text);
+    return info ? INK.sectionForStory(info.story) : null;
+  }
+
   function grade(g) {
     if (!session || !session.revealed) return;
     const text = session.queue[session.idx];
@@ -424,8 +435,9 @@ const SRS = (() => {
     session.stats[g]++;
     // золотые чернила: «Хорошо/Легко» — верный ответ, «Трудно» — половинный
     if (typeof INK !== 'undefined') {
-      if (g === 'good' || g === 'easy') INK.add(INK.P.correct);
-      else if (g === 'hard') INK.add(1);
+      const sec = inkSectionForWord(text);
+      if (g === 'good' || g === 'easy') INK.add(INK.P.correct, sec);
+      else if (g === 'hard') INK.add(1, sec);
     }
     if (g === 'again') session.queue.push(text); // повтор в текущей сессии
     nextCard();

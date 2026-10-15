@@ -188,18 +188,22 @@ function renderHome() {
   const todayDate = new Date().toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' });
   const lastStory = haveSrs ? SRS.getLastStory() : null; // для «Продолжить чтение»
   const isIslam = (typeof getMode === 'function') ? getMode() === 'islam' : true;
-  const inkLi = (typeof INK !== 'undefined') ? INK.levelInfo() : null;
-  const inkHtml = inkLi ? `
-      <div class="ink-line">
-        <span class="ink-level">${escapeHtml(inkLi.name)}</span>
-        <span class="ink-amount">${INK.total()} золотых чернил</span>
-      </div>
-      <div class="ink-bar" role="img" aria-label="Прогресс уровня: ${inkLi.pct}%">
-        <div class="ink-fill" style="width:${inkLi.pct}%"></div>
-      </div>
-      <p class="ink-next">${inkLi.nextName
-        ? 'до «' + escapeHtml(inkLi.nextName) + '»: ' + inkLi.toNext
-        : 'высший уровень достигнут'}</p>` : '';
+  const inkSections = (typeof INK !== 'undefined') ? INK.sections() : [];
+  const inkHtml = inkSections.length ? `
+      <div class="ink-block">
+        <div class="ink-block-head">
+          <span class="ink-block-title">Уровни практики</span>
+          <button type="button" class="ink-help-btn" id="inkHelpBtn">Как растут уровни</button>
+        </div>
+        <div class="ink-chips">
+          ${inkSections.map(s => `
+            <button type="button" class="ink-chip" data-ink-section="${s.id}">
+              <span class="ink-chip-sec">${escapeHtml(s.label)}</span>
+              <span class="ink-chip-level">${escapeHtml(s.level.name)}</span>
+              <span class="ink-chip-ink">${s.ink}</span>
+            </button>`).join('')}
+        </div>
+      </div>` : '';
 
   const countersHtml = isIslam
     ? `${sc.due} слов и ${hc.due} аятов ждут повторения${sc.newAvailable ? ' · доступно новых слов: ' + sc.newAvailable : ''}`
@@ -315,4 +319,11 @@ function renderHome() {
   if (hmReadMore) hmReadMore.addEventListener('click', () => {
     if (lastStory) openStory(lastStory.id); else switchTo('quran');
   });
+
+  // Уровни практики: чип раздела или «Как растут уровни» → окно «Уровни»
+  document.querySelectorAll('.ink-chip[data-ink-section]').forEach(chip => {
+    chip.addEventListener('click', () => openLevelsModal(chip.dataset.inkSection));
+  });
+  const inkHelp = document.getElementById('inkHelpBtn');
+  if (inkHelp) inkHelp.addEventListener('click', () => openLevelsModal());
 }

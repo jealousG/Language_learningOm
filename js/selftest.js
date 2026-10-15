@@ -385,23 +385,47 @@
     try { backup = localStorage.getItem(KEY); } catch (e) { /* нет доступа — тесты ниже пропустим */ }
     try {
       const before = INK.total();
+      const hadithBefore = INK.inkOf('hadith');
       INK.mark();
-      INK.add(INK.P.correct);
-      INK.add(INK.P.comboBonus);
+      INK.add(INK.P.correct, 'quran');
+      INK.add(INK.P.comboBonus, 'quran');
       eq('INK: add аккумулирует', INK.total() - before, INK.P.correct + INK.P.comboBonus);
       eq('INK: sinceMark считает прирост сессии', INK.sinceMark(), INK.P.correct + INK.P.comboBonus);
-      INK.add(0);
-      INK.add(-5);
+      INK.add(0, 'quran');
+      INK.add(-5, 'quran');
       eq('INK: add игнорирует неположительные', INK.sinceMark(), INK.P.correct + INK.P.comboBonus);
-      const li = INK.levelInfo();
-      record(li.pct >= 0 && li.pct <= 100, 'INK: прогресс уровня 0–100%', li.pct);
-      record(typeof li.name === 'string' && li.name.length > 0, 'INK: уровень имеет имя', li.name);
+
+      // чернила раздельные: в quran накопилось, в hadith — не изменилось
+      const qInk = INK.inkOf('quran');
+      record(qInk >= INK.P.correct + INK.P.comboBonus, 'INK: чернила копятся в своём разделе', qInk);
+      eq('INK: чужой раздел не тронут', INK.inkOf('hadith'), hadithBefore);
+
+      // уровни: чистая функция по числу чернил
+      eq('INK: levelInfo(150) → «Переписчик»', INK.levelInfo(150).name, 'Переписчик');
+      eq('INK: levelInfo(300) → 50% до следующего', INK.levelInfo(300).pct, 50);
+      eq('INK: levelInfo(0) → 0%', INK.levelInfo(0).pct, 0);
+      eq('INK: levelInfo(6000) → высший (100%)', INK.levelInfo(6000).pct, 100);
+      eq('INK: levelInfo(300) → до следующего 150', INK.levelInfo(300).toNext, 150);
     } finally {
       try {
         if (backup === null) localStorage.removeItem(KEY);
         else localStorage.setItem(KEY, backup);
       } catch (e) { /* игнорируем */ }
     }
+
+    // разделы и атрибуция (чистая логика)
+    eq('INK: тип quran → раздел quran', INK.sectionForType('quran'), 'quran');
+    eq('INK: тип story → раздел stories', INK.sectionForType('story'), 'stories');
+    eq('INK: тип namaz → раздел routes', INK.sectionForType('namaz'), 'routes');
+    eq('INK: тип huna2 → раздел huna2', INK.sectionForType('huna2'), 'huna2');
+    eq('INK: неизвестный тип → «прочее»', INK.sectionForType('zzz'), 'other');
+    eq('INK: доминирующий раздел сессии', INK.dominantSection(['quran', 'quran', 'hadith']), 'quran');
+    eq('INK: пустой список → null', INK.dominantSection([]), null);
+    const isl = INK.sections('islam');
+    record(isl.length >= 6 && isl.some(s => s.id === 'hifz'), 'INK: у «Ислама» есть раздел «Хифз»', isl.length);
+    const ar = INK.sections('arabic');
+    eq('INK: у «Арабского» два тома', ar.map(s => s.id).join(','), 'huna1,huna2');
+    record(ar.every(s => s.level && typeof s.level.name === 'string'), 'INK: у каждого раздела свой уровень');
   }
 
   // Запуск: сначала синхронные тесты ядра, затем асинхронные тесты хранилища

@@ -143,7 +143,7 @@ function resolveStudySource(sourceId) {
       if (ch) {
         const sentences = [];
         (ch.dialogues || []).forEach(d => (d.sentences || []).forEach(s => sentences.push(s)));
-        return { id: sourceId, title: ch.titleAr || '', titleRu: `Глава ${ch.no}. ${ch.titleRu || ''}`.trim(), sentences, chapterId: ch.id };
+        return { id: sourceId, type: b.id, title: ch.titleAr || '', titleRu: `Глава ${ch.no}. ${ch.titleRu || ''}`.trim(), sentences, chapterId: ch.id };
       }
     }
     return null;
