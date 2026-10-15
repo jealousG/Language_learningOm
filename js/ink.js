@@ -66,12 +66,32 @@ const INK = (() => {
   let lastMark = null;   // чернила на момент метки начала сессии
   let levelUpPending = null;
 
+  // известный раздел → его Основа (для строгой проверки атрибуции)
+  const KNOWN_SECTIONS = (() => {
+    const map = {};
+    Object.keys(SECTIONS).forEach(m => SECTIONS[m].forEach(s => { map[s.id] = m; }));
+    return map;
+  })();
+
+  /** Ключ «Прочее» для Основы: чернила без точной атрибуции не теряются. */
+  function otherId(mode) { return 'other:' + (mode || currentMode()); }
+
+  /** Раздел не привязан к конкретному месту («Прочее», пустой или неизвестный). */
+  function isOtherSection(sid) {
+    if (!sid) return true;
+    const s = String(sid);
+    if (s === OTHER.id || s.indexOf('other:') === 0) return true;
+    return !KNOWN_SECTIONS[s];
+  }
+
   /** Основа по id раздела (null — раздел не привязан к Основе). */
   function modeOfSection(sid) {
-    for (const m of Object.keys(SECTIONS)) {
-      if (SECTIONS[m].some(s => s.id === sid)) return m;
+    const s = String(sid || '');
+    if (s.indexOf('other:') === 0) {
+      const m = s.slice(6);
+      return SECTIONS[m] ? m : null;
     }
-    return null;
+    return KNOWN_SECTIONS[s] || null;
   }
 
   function modeIds() {
@@ -150,6 +170,14 @@ const INK = (() => {
     modeIds().forEach(id => {
       if (typeof cache.legacyBy[id] !== 'number' || !isFinite(cache.legacyBy[id])) cache.legacyBy[id] = 0;
     });
+    // миграция: «Прочее» без Основы → «Прочее» текущей Основы (иначе чернила
+    // не попадали ни в один уровень и не были видны в разбивке)
+    if (cache.by[OTHER.id]) {
+      const k = otherId();
+      cache.by[k] = (cache.by[k] || 0) + cache.by[OTHER.id];
+      delete cache.by[OTHER.id];
+      save();
+    }
     return cache;
   }
 
@@ -185,12 +213,16 @@ const INK = (() => {
     return OTHER.label;
   }
 
-  /** Добавить чернила в раздел (section — id раздела; без него — «Прочее»). */
+  /**
+   * Добавить чернила в раздел (section — id раздела).
+   * Без раздела (или с неизвестным) чернила идут в «Прочее» ТЕКУЩЕЙ Основы,
+   * чтобы они не выпадали из её уровня и были видны в разбивке.
+   */
   function add(n, section) {
     n = Math.round(n);
     if (!n || n <= 0) return total();
     const c = load();
-    const sid = section || OTHER.id;
+    const sid = isOtherSection(section) ? otherId() : section;
     const mid = modeOfSection(sid);
     const before = levelIndex(mid ? modeInk(mid) : inkOf(sid));
     c.by[sid] = (c.by[sid] || 0) + n;
@@ -242,6 +274,7 @@ const INK = (() => {
     const list = SECTIONS[m] || SECTIONS.islam;
     let sum = load().legacyBy[m] || 0;
     list.forEach(s => { sum += inkOf(s.id); });
+    sum += inkOf(otherId(m)); // «Прочее» этой Основы
     return sum;
   }
 
@@ -296,8 +329,10 @@ const INK = (() => {
   /** Разделы Основы с их чернилами: [{id, label, ink}] — без уровней. */
   function sectionInkList(mode) {
     const m = mode || currentMode();
-    const list = SECTIONS[m] || SECTIONS.islam;
-    return list.map(s => ({ id: s.id, label: s.label, ink: inkOf(s.id) }));
+    const list = (SECTIONS[m] || SECTIONS.islam).map(s => ({ id: s.id, label: s.label, ink: inkOf(s.id) }));
+    const o = inkOf(otherId(m));
+    if (o > 0) list.push({ id: otherId(m), label: OTHER.label, ink: o });
+    return list;
   }
 
   /** Разбивка по разделам для окна «Уровни»: [{mode, title, ink, sections}]. */

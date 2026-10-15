@@ -429,6 +429,16 @@
         INK.modeLevel('islam').index, INK.levelIndex(INK.modeInk('islam')));
       eq('INK: у Основы один уровень на все её разделы',
         INK.modeLevel('islam').name, INK.levelInfo(INK.modeInk('islam')).name);
+
+      // чернила без точной атрибуции не теряются: «Прочее» текущей Основы
+      const mid = INK.currentMode();
+      const modeBefore = INK.modeInk(mid);
+      INK.add(INK.P.correct); // без раздела
+      eq('INK: чернила без раздела попадают в текущую Основу', INK.modeInk(mid) - modeBefore, INK.P.correct);
+      record(INK.sectionInkList(mid).some(s => s.label === 'Прочее' && s.ink > 0),
+        'INK: «Прочее» видно в разбивке Основы');
+      eq('INK: у «Прочее» нет своего уровня',
+        INK.sectionInkList(mid).filter(s => s.label === 'Прочее').length, 1);
     } finally {
       try {
         if (backup === null) localStorage.removeItem(KEY);
