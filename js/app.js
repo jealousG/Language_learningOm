@@ -1380,12 +1380,12 @@ function closeWordCard() {
 
 // ------------------------- Окно «Уровни и чернила» -------------------------
 
-/** Открыть окно уровней (можно с фокусом на разделе). */
-function openLevelsModal(sectionId) {
+/** Открыть окно уровней. */
+function openLevelsModal() {
   if (typeof INK === 'undefined') return;
   const el = document.getElementById('levelsModal');
   if (!el) return;
-  renderLevelsModal(sectionId);
+  renderLevelsModal();
   el.classList.remove('hidden');
   document.getElementById('overlay').classList.remove('hidden');
   focusModal(el);
@@ -1403,62 +1403,72 @@ function closeLevelsModal() {
   restoreModalFocus();
 }
 
-/** Содержимое окна: правила начисления, разделы с уровнями, лестница уровней. */
-function renderLevelsModal(focusSection) {
+/**
+ * Содержимое окна «Уровни»: лестница «пути писца» с отметкой «Вы здесь»,
+ * затем коротко начисления и разбивка чернил по разделам.
+ * Уровень — один на Основу («Ислам» / «Арабский язык»).
+ */
+function renderLevelsModal() {
   const body = document.getElementById('levelsBody');
   if (!body) return;
   const P = INK.P;
+  const cur = INK.currentMode();
+  const all = INK.modes();
+  const mine = all.find(m => m.id === cur) || all[0];
 
+  // 1. Лестница уровней: где я сейчас (текущая Основа) и где вторая Основа
+  const ladderHtml = `<div class="lv-ladder">
+      <h4 class="lv-h">Лестница уровней</h4>
+      <p class="lv-where">Вы здесь: <b>${escapeHtml(mine.level.name)}</b>
+        <span class="lv-where-sub">${escapeHtml(mine.title)} · ${mine.ink} чернил${mine.level.nextName ? ' · до «' + escapeHtml(mine.level.nextName) + '»: ' + mine.level.toNext : ' · высшая ступень'}</span></p>
+      <div class="lv-bar lv-bar-wide"><div class="lv-fill" style="width:${mine.level.pct}%"></div></div>
+      ${INK.LEVELS.map((l, i) => {
+        const here = i === mine.level.index;
+        const others = all.filter(m => m.id !== mine.id && m.level.index === i);
+        return `
+        <div class="lv-step${here ? ' lv-step-now' : ''}">
+          <span class="lv-step-no">${i + 1}</span>
+          <span class="lv-step-name">${escapeHtml(l.name)}</span>
+          ${here ? '<span class="lv-badge lv-badge-now">Вы здесь</span>' : ''}
+          ${others.map(m => `<span class="lv-badge">${escapeHtml(m.title)}</span>`).join('')}
+          <span class="lv-step-min">${l.min} чернил</span>
+        </div>`;
+      }).join('')}
+    </div>`;
+
+  // 2. Коротко: как копятся чернила
   const rules = [
     ['Верный ответ', '+' + P.correct],
-    ['Серия из ' + P.comboEvery + ' верных подряд', '+' + P.comboBonus],
+    ['Серия из ' + P.comboEvery + ' подряд', '+' + P.comboBonus],
     ['Выученное слово', '+' + P.learned],
-    ['Сборка аята без ошибок', '+' + P.build],
-    ['Завершённая сессия', '+' + P.session],
-    ['Аят хифза (не «Не помню»)', '+' + P.ayah]
+    ['Сборка аята', '+' + P.build],
+    ['Сессия', '+' + P.session],
+    ['Аят хифза', '+' + P.ayah]
   ];
-
   const rulesHtml = `<div class="lv-rules">
       <h4 class="lv-h">Как копятся чернила</h4>
       <div class="lv-rules-grid">
         ${rules.map(([t, v]) => `<div class="lv-rule"><span class="lv-rule-t">${escapeHtml(t)}</span><span class="lv-rule-v">${v}</span></div>`).join('')}
       </div>
-      <p class="lv-note">Чернила не тратятся: это мера практики. В каждом разделе свой счёт и свой уровень.</p>
+      <p class="lv-note">Чернила не тратятся: это мера практики. Уровень — один на Основу.</p>
     </div>`;
 
+  // 3. Разбивка: чернила по разделам (без отдельных уровней)
   const groups = INK.breakdown();
   const sectionsHtml = groups.map(g => `
-    <div class="lv-group">
-      <h4 class="lv-h">${escapeHtml(g.title)}</h4>
-      ${g.sections.map(s => `
-        <div class="lv-row${s.id === focusSection ? ' lv-row-focus' : ''}">
-          <span class="lv-sec">${escapeHtml(s.label)}</span>
-          <span class="lv-level">${escapeHtml(s.level.name)}</span>
-          <span class="lv-ink">${s.ink}</span>
-          <div class="lv-bar"><div class="lv-fill" style="width:${s.level.pct}%"></div></div>
-          <span class="lv-next">${s.level.nextName ? 'до «' + escapeHtml(s.level.nextName) + '»: ' + s.level.toNext : 'высший уровень'}</span>
-        </div>`).join('')}
+    <div class="lv-group${g.mode === cur ? ' lv-group-now' : ''}">
+      <h4 class="lv-h">${escapeHtml(g.title)} <span class="lv-group-ink">${g.ink} чернил</span></h4>
+      <div class="lv-chips">
+        ${g.sections.map(s => `<span class="lv-chip">${escapeHtml(s.label)} <b>${s.ink}</b></span>`).join('')}
+      </div>
     </div>`).join('');
 
-  const legacyInk = INK.legacy();
-  const legacyHtml = legacyInk > 0
-    ? `<p class="lv-note">Ранее накоплено (до разделения по разделам): <b>${legacyInk}</b>.</p>`
+  const legacy = INK.legacyTotal();
+  const legacyHtml = legacy > 0
+    ? `<p class="lv-note">Ранее накоплено (заслуги до разделения по разделам): <b>${legacy}</b>${all.map(m => INK.legacyOf(m.id) > 0 ? ` · ${escapeHtml(m.title)}: ${INK.legacyOf(m.id)}` : '').join('')}.</p>`
     : '';
 
-  // лестница уровней: подсвечиваем уровень выбранного раздела (или общий)
-  const refInk = focusSection ? INK.inkOf(focusSection) : INK.total();
-  const refIndex = INK.levelIndex(refInk);
-  const ladderHtml = `<div class="lv-ladder">
-      <h4 class="lv-h">Лестница уровней</h4>
-      ${INK.LEVELS.map((l, i) => `
-        <div class="lv-step${i === refIndex ? ' lv-step-now' : ''}">
-          <span class="lv-step-no">${i + 1}</span>
-          <span class="lv-step-name">${escapeHtml(l.name)}</span>
-          <span class="lv-step-min">${l.min} чернил</span>
-        </div>`).join('')}
-    </div>`;
-
-  body.innerHTML = rulesHtml + `<div class="lv-sections">${sectionsHtml}</div>` + ladderHtml + legacyHtml;
+  body.innerHTML = ladderHtml + rulesHtml + `<div class="lv-sections">${sectionsHtml}</div>` + legacyHtml;
 }
 
 // ------------------------- Аудио отдельного слова -------------------------
@@ -1941,7 +1951,9 @@ function renderStudyDashboard() {
   }).join('');
 
   const accuracy = totalAnswers ? Math.round(correctAnswers / totalAnswers * 100) : 0;
-  const inkTotal = (typeof INK !== 'undefined') ? INK.total() : 0;
+  // чернила и уровень текущей Основы (один «путь писца» на Основу)
+  const inkMode = (typeof INK !== 'undefined') ? INK.modeInk() : 0;
+  const inkLevel = (typeof INK !== 'undefined') ? INK.modeLevel() : null;
 
   const hardHtml = hard.length
     ? hard.slice(0, 8).map(({ text, e }) => `
@@ -1958,7 +1970,7 @@ function renderStudyDashboard() {
       <div class="stat-box"><div class="stat-num">${solid}</div><div class="stat-label">закреплено (в повторении)</div></div>
       <div class="stat-box"><div class="stat-num">${learnedWordsCount()}</div><div class="stat-label">выучено (5 верных подряд)</div></div>
       <div class="stat-box"><div class="stat-num">${totalAnswers ? accuracy + '%' : '—'}</div><div class="stat-label">точность ответов</div></div>
-      ${typeof INK !== 'undefined' ? `<button type="button" class="stat-box ink-box" id="inkTotalBox"><div class="stat-num">${inkTotal}</div><div class="stat-label">золотых чернил всего · уровни</div></button>` : ''}
+      ${inkLevel ? `<button type="button" class="stat-box ink-box" id="inkTotalBox"><div class="stat-num">${inkMode}</div><div class="stat-label">чернил · ${escapeHtml(inkLevel.name)}</div></button>` : ''}
     </div>
     ${sectionsHtml}
     <p class="stats-legend">Полоса: <span class="seg-demo start"></span> взято в изучение · <span class="seg-demo solid"></span> закреплено (периодическое повторение)</p>

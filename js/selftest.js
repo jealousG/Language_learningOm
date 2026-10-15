@@ -47,6 +47,14 @@
     s.className = failed === 0 ? 'ok' : 'bad';
   }
 
+  // Последний render + явный маркер завершения: сводка пишется по стадиям,
+  // поэтому раннее чтение страницы даёт неполное число (например, только
+  // синхронные тесты). Автопроверки должны ждать data-selftest="done".
+  function finish() {
+    render();
+    document.body.setAttribute('data-selftest', 'done');
+  }
+
   function loadScript(src) {
     return new Promise((resolve, reject) => {
       const s = document.createElement('script');
@@ -261,12 +269,12 @@
       } finally {
         restore();
         record(true, 'Реальные данные localStorage восстановлены');
-        render();
+        finish();
       }
     }).catch(err => {
       record(false, 'Загрузка srs.js для тестов миграции', err.message);
       restore();
-      render();
+      finish();
     });
   }
 
@@ -366,13 +374,15 @@
     if (typeof INK === 'undefined') return;
 
     // чистая логика уровней (пороги включительно)
-    eq('INK: 0 → «Ученик»', INK.levelIndex(0), 0);
+    eq('INK: 0 → «Новичок»', INK.levelIndex(0), 0);
     eq('INK: 149 → уровень 0', INK.levelIndex(149), 0);
-    eq('INK: 150 → уровень 1 (Переписчик)', INK.levelIndex(150), 1);
-    eq('INK: 450 → уровень 2 (Калист)', INK.levelIndex(450), 2);
-    eq('INK: 1000 → уровень 3 (Чтец)', INK.levelIndex(1000), 3);
+    eq('INK: 150 → уровень 1 (Ученик)', INK.levelIndex(150), 1);
+    eq('INK: 450 → уровень 2 (Читающий)', INK.levelIndex(450), 2);
+    eq('INK: 1000 → уровень 3 (Знающий)', INK.levelIndex(1000), 3);
     eq('INK: 6000 → высший уровень', INK.levelIndex(6000), INK.LEVELS.length - 1);
     eq('INK: потолок уровня', INK.levelIndex(999999), INK.LEVELS.length - 1);
+    eq('INK: названия ступеней', INK.LEVELS.map(l => l.name).join(' · '),
+      'Новичок · Ученик · Читающий · Знающий · Умелый · Опытный · Мастер');
 
     const names = INK.LEVELS.map(l => l.name);
     eq('INK: имена уровней уникальны', new Set(names).size, names.length);
@@ -401,11 +411,24 @@
       eq('INK: чужой раздел не тронут', INK.inkOf('hadith'), hadithBefore);
 
       // уровни: чистая функция по числу чернил
-      eq('INK: levelInfo(150) → «Переписчик»', INK.levelInfo(150).name, 'Переписчик');
+      eq('INK: levelInfo(150) → «Ученик»', INK.levelInfo(150).name, 'Ученик');
       eq('INK: levelInfo(300) → 50% до следующего', INK.levelInfo(300).pct, 50);
       eq('INK: levelInfo(0) → 0%', INK.levelInfo(0).pct, 0);
       eq('INK: levelInfo(6000) → высший (100%)', INK.levelInfo(6000).pct, 100);
       eq('INK: levelInfo(300) → до следующего 150', INK.levelInfo(300).toNext, 150);
+
+      // ОДИН уровень на Основу: чернила Основы = сумма её разделов + «ранее накопленное»
+      const quranBefore = INK.inkOf('quran');
+      const islBefore = INK.modeInk('islam');
+      const arBefore = INK.modeInk('arabic');
+      INK.add(INK.P.correct, 'quran');
+      eq('INK: чернила «Ислама» выросли на ответ', INK.modeInk('islam') - islBefore, INK.P.correct);
+      eq('INK: «Арабский» не тронут чужим разделом', INK.modeInk('arabic'), arBefore);
+      eq('INK: раздел входит в чернила своей Основы', INK.inkOf('quran') - quranBefore, INK.P.correct);
+      eq('INK: уровень Основы считается по её чернилам',
+        INK.modeLevel('islam').index, INK.levelIndex(INK.modeInk('islam')));
+      eq('INK: у Основы один уровень на все её разделы',
+        INK.modeLevel('islam').name, INK.levelInfo(INK.modeInk('islam')).name);
     } finally {
       try {
         if (backup === null) localStorage.removeItem(KEY);
@@ -421,11 +444,24 @@
     eq('INK: неизвестный тип → «прочее»', INK.sectionForType('zzz'), 'other');
     eq('INK: доминирующий раздел сессии', INK.dominantSection(['quran', 'quran', 'hadith']), 'quran');
     eq('INK: пустой список → null', INK.dominantSection([]), null);
-    const isl = INK.sections('islam');
+    const isl = INK.sectionInkList('islam');
     record(isl.length >= 6 && isl.some(s => s.id === 'hifz'), 'INK: у «Ислама» есть раздел «Хифз»', isl.length);
-    const ar = INK.sections('arabic');
+    eq('INK: разбивка — только чернила, без уровней', 'level' in (isl[0] || {}), false);
+    const ar = INK.sectionInkList('arabic');
     eq('INK: у «Арабского» два тома', ar.map(s => s.id).join(','), 'huna1,huna2');
-    record(ar.every(s => s.level && typeof s.level.name === 'string'), 'INK: у каждого раздела свой уровень');
+
+    // Основы: ровно две, у каждой ровно один уровень
+    const ms = INK.modes();
+    eq('INK: Основ ровно две', ms.map(m => m.id).join(','), 'islam,arabic');
+    record(ms.every(m => m.level && typeof m.level.name === 'string' && typeof m.ink === 'number'),
+      'INK: у каждой Основы один уровень и свой счёт');
+    eq('INK: уровень Основы — не уровень раздела',
+      INK.modeOfSection('hifz'), 'islam');
+    eq('INK: раздел «Прочее» без Основы', INK.modeOfSection('other'), null);
+    const legacySum = INK.legacyTotal();
+    const legacyParts = ms.reduce((a, m) => a + INK.legacyOf(m.id), 0);
+    eq('INK: «ранее накопленное» разнесено по Основам без потерь', legacyParts, legacySum);
+    record(INK.modeInk('islam') >= INK.inkOf('quran'), 'INK: чернила Основы ≥ чернил одного раздела', INK.modeInk('islam'));
   }
 
   // Запуск: сначала синхронные тесты ядра, затем асинхронные тесты хранилища

@@ -188,21 +188,24 @@ function renderHome() {
   const todayDate = new Date().toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' });
   const lastStory = haveSrs ? SRS.getLastStory() : null; // для «Продолжить чтение»
   const isIslam = (typeof getMode === 'function') ? getMode() === 'islam' : true;
-  const inkSections = (typeof INK !== 'undefined') ? INK.sections() : [];
-  const inkHtml = inkSections.length ? `
+  // Уровень — один на Основу (текущий режим); чип открывает окно «Уровни»
+  const inkMid = (typeof getMode === 'function') ? getMode() : 'islam';
+  const inkLv = (typeof INK !== 'undefined') ? INK.modeLevel(inkMid) : null;
+  const inkVal = (typeof INK !== 'undefined') ? INK.modeInk(inkMid) : 0;
+  const inkLabel = (typeof INK !== 'undefined') ? INK.modeLabel(inkMid) : '';
+  const inkHtml = inkLv ? `
       <div class="ink-block">
         <div class="ink-block-head">
           <span class="ink-block-title">Уровни практики</span>
           <button type="button" class="ink-help-btn" id="inkHelpBtn">Как растут уровни</button>
         </div>
-        <div class="ink-chips">
-          ${inkSections.map(s => `
-            <button type="button" class="ink-chip" data-ink-section="${s.id}">
-              <span class="ink-chip-sec">${escapeHtml(s.label)}</span>
-              <span class="ink-chip-level">${escapeHtml(s.level.name)}</span>
-              <span class="ink-chip-ink">${s.ink}</span>
-            </button>`).join('')}
-        </div>
+        <button type="button" class="ink-chip" id="inkChip">
+          <span class="ink-chip-sec">${escapeHtml(inkLabel)}</span>
+          <span class="ink-chip-level">${escapeHtml(inkLv.name)}</span>
+          <span class="ink-chip-ink">${inkVal}</span>
+        </button>
+        <div class="ink-bar"><div class="ink-fill" style="width:${inkLv.pct}%"></div></div>
+        <p class="ink-next">${inkLv.nextName ? 'до «' + escapeHtml(inkLv.nextName) + '»: ' + inkLv.toNext + ' чернил' : 'высшая ступень'}</p>
       </div>` : '';
 
   const countersHtml = isIslam
@@ -320,10 +323,9 @@ function renderHome() {
     if (lastStory) openStory(lastStory.id); else switchTo('quran');
   });
 
-  // Уровни практики: чип раздела или «Как растут уровни» → окно «Уровни»
-  document.querySelectorAll('.ink-chip[data-ink-section]').forEach(chip => {
-    chip.addEventListener('click', () => openLevelsModal(chip.dataset.inkSection));
-  });
+  // Уровни практики: чип Основы или «Как растут уровни» → окно «Уровни»
+  const inkChip = document.getElementById('inkChip');
+  if (inkChip) inkChip.addEventListener('click', () => openLevelsModal());
   const inkHelp = document.getElementById('inkHelpBtn');
   if (inkHelp) inkHelp.addEventListener('click', () => openLevelsModal());
 }
