@@ -194,8 +194,12 @@ const HIFZ = (() => {
 
   function playOnce(url) {
     stopPlayback();
-    if (typeof pausePlayer === 'function') pausePlayer();
-    if (typeof stopWordAudio === 'function') stopWordAudio(); // не накладываем потоки
+    // не накладываем потоки: глушим плеер, слово и свою запись
+    if (typeof stopAllAudio === 'function') stopAllAudio('hifz');
+    else {
+      if (typeof pausePlayer === 'function') pausePlayer();
+      if (typeof stopWordAudio === 'function') stopWordAudio();
+    }
     const a = makeAyahAudio(url);
     a.playbackRate = (session && session.speed) || 1;
     play = { cancelled: false, paused: false, audio: a, timer: null, timerFn: null, timerStart: 0, timerDur: 0, timerLeft: null };
@@ -219,8 +223,12 @@ const HIFZ = (() => {
    */
   function playSequence(sents, opts, onProgress, onDone) {
     stopPlayback(); // единственная активная цепочка — никаких параллельных
-    if (typeof pausePlayer === 'function') pausePlayer();
-    if (typeof stopWordAudio === 'function') stopWordAudio();
+    // и глушим прочие потоки: плеер, слово, свою запись
+    if (typeof stopAllAudio === 'function') stopAllAudio('hifz');
+    else {
+      if (typeof pausePlayer === 'function') pausePlayer();
+      if (typeof stopWordAudio === 'function') stopWordAudio();
+    }
     play = { cancelled: false, paused: false, audio: null, timer: null, timerFn: null, timerStart: 0, timerDur: 0, timerLeft: null };
     const P = play;
     let si = 0, rep = 0;

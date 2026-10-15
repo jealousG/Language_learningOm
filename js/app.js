@@ -72,6 +72,7 @@ function updateHarakatControls() {
 // и НЕ является проверкой правильности чтения или таджвида.
 
 let recState = null; // { recorder, stream, url }
+let recAudio = null; // воспроизведение своей записи (одно за раз)
 
 function recSupported() {
   return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder);
@@ -138,14 +139,25 @@ async function toggleRecording() {
 
 function playRecording() {
   if (!recState || !recState.url) return;
-  stopPlayer();
-  if (typeof HIFZ !== 'undefined') HIFZ.stop();
-  new Audio(recState.url).play().catch(() => {
+  stopAllAudio('rec'); // одно аудио за раз: глушим слово, плеер и Хифз
+  const a = new Audio(recState.url);
+  recAudio = a;
+  a.addEventListener('ended', () => { if (recAudio === a) recAudio = null; });
+  a.play().catch(() => {
+    if (recAudio === a) recAudio = null;
     setRecStatus('Не удалось воспроизвести запись.');
   });
 }
 
+/** Остановить воспроизведение своей записи (если играет). */
+function stopRecordingAudio() {
+  if (!recAudio) return;
+  try { recAudio.pause(); } catch (e) {}
+  recAudio = null;
+}
+
 function deleteRecording(showMsg) {
+  stopRecordingAudio();
   if (!recState) return;
   if (recState.recorder && recState.recorder.state === 'recording') {
     try { recState.recorder.onstop = null; recState.recorder.stop(); } catch (e) {}
@@ -274,11 +286,10 @@ function switchTo(section) {
   }
   currentSection = section;
   clearAdvance(); // останавливаем авто-переход тренажёра при смене раздела
-  stopPlayer();
+  stopPlayer(); // плеер читалки: пауза + сброс UI
+  stopAllAudio(); // один аудиопоток: глушим слово, Хифз и свою запись
   clearPlayingHighlight();
   closeWordCard();
-  if (typeof HIFZ !== 'undefined') HIFZ.stop(); // останавливаем аудио хифза при уходе
-  stopWordAudio(); // и аудио слова
   stopRecordingIfActive(); // останавливаем запись голоса при уходе
   ['screen-home', 'screen-routes', 'screen-list', 'screen-hadith', 'screen-stories', 'screen-adhkar', 'screen-study', 'screen-review', 'screen-hifz', 'screen-huna1', 'screen-huna2', 'screen-words', 'screen-grammar', 'screen-grammar-note', 'screen-reader'].forEach(id => {
     document.getElementById(id).classList.add('hidden');
@@ -1343,12 +1354,11 @@ function closeWordCard() {
 // ------------------------- Аудио отдельного слова -------------------------
 
 function playWordAudio(src) {
-  stopWordAudio();
-  // приостанавливаем прочие аудиопотоки, чтобы записи не накладывались
-  if (playerAudio && !playerAudio.paused) pausePlayer();
-  if (typeof HIFZ !== 'undefined') HIFZ.stop();
-  wordAudio = new Audio(src);
-  wordAudio.play().catch(err => {
+  stopAllAudio('word'); // одно аудио за раз: глушим плеер, Хифз и свою запись
+  const a = new Audio(src);
+  wordAudio = a;
+  a.addEventListener('ended', () => { if (wordAudio === a) wordAudio = null; });
+  a.play().catch(err => {
     showPlayerStatus('Не удалось воспроизвести слово. Проверьте интернет-соединение.');
   });
 }
@@ -1358,6 +1368,19 @@ function stopWordAudio() {
     wordAudio.pause();
     wordAudio = null;
   }
+}
+
+/**
+ * Один аудиопоток на весь сайт: перед новым воспроизведением глушим
+ * предыдущее — слово, плеер читалки, Хифз и воспроизведение своей записи.
+ * keep — источник, который стартует сейчас и глушить который не нужно
+ * ('word' | 'player' | 'hifz' | 'rec').
+ */
+function stopAllAudio(keep) {
+  if (keep !== 'word') stopWordAudio();
+  if (keep !== 'player') pausePlayer();
+  if (keep !== 'hifz' && typeof HIFZ !== 'undefined') HIFZ.stop();
+  if (keep !== 'rec') stopRecordingAudio();
 }
 
 // ------------------------- Плеер истории (по аятам) -------------------------
@@ -1544,9 +1567,8 @@ function playFromAyah(sIdx) {
 
 function playPlayer() {
   if (!playlist.length || !playerAudio) return;
-  // один аудиопоток: перед стартом аятов глушим слово и Хифз
-  stopWordAudio();
-  if (typeof HIFZ !== 'undefined') HIFZ.stop();
+  // один аудиопоток: перед стартом аятов глушим слово, Хифз и свою запись
+  stopAllAudio('player');
   wantPlaying = true;
   if (!playerAudio.src) {
     loadAyah(0, 0);
