@@ -288,6 +288,19 @@
     eq('wordsNorm: пунктуация снята', wordsNorm('بَيْتٌ،'), 'بيت');
     eq('wordsNorm: падежные формы → один ключ', wordsNorm('الدِّينُ') === wordsNorm('الدِّينِ'), true);
 
+    // wordDisplay — слово для показа ОТДЕЛЬНО от текста (без обрамляющей пунктуации)
+    if (typeof wordDisplay === 'function') {
+      eq('wordDisplay: арабская запятая убрана', wordDisplay('الْكَهْفِ،'), 'الْكَهْفِ');
+      eq('wordDisplay: арабский вопрос убран', wordDisplay('اسْمُكَ؟'), 'اسْمُكَ');
+      eq('wordDisplay: арабская точка с запятой убрана', wordDisplay('الْجُمُعَةِ؛'), 'الْجُمُعَةِ');
+      eq('wordDisplay: слово без пунктуации не тронуто', wordDisplay('كِتَابٌ'), 'كِتَابٌ');
+      eq('wordDisplay: скобки убраны', wordDisplay('(مكة)'), 'مكة');
+      eq('wordDisplay: пустой вход', wordDisplay(''), '');
+      eq('wordDisplay: огласовки сохранены', wordDisplay('طَيِّبَةٌ،'), 'طَيِّبَةٌ');
+    } else {
+      record(false, 'wordDisplay загружен');
+    }
+
     const ch = (typeof HUNA_DATA !== 'undefined' && HUNA_DATA.books && HUNA_DATA.books[0] && HUNA_DATA.books[0].chapters[0]) || null;
     if (ch) {
       const entries = chapterWordEntries(ch, {}, {}, 3);

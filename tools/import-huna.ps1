@@ -76,16 +76,27 @@ function ExtractTrRu($cells, $header) {
       if (-not $c) { continue }
       if ((HasLatin $c) -and -not (HasCyr $c) -and -not $tr) { $tr = $c }
     }
-    for ($i = $cells.Count - 1; $i -ge 1; $i--) {
-      $c = $cells[$i]
-      if (-not $c) { continue }
-      if (-not (HasCyr $c)) { continue }
-      if ($GENDER_WORDS -contains $c.ToLower()) { continue }
-      if ($tr -and $c -eq $tr) { continue }
-      $ru = $c; break
+    # Перевод берём из последней кириллической ячейки ТОЛЬКО если таблица
+    # устроена как «слово | перевод» или «слово | чтение | перевод».
+    # Если вторая ячейка арабская, это таблица вида «слово | фраза | перевод»
+    # (ДЗ, грамматика): перевод относится к фразе, а не к слову — иначе
+    # слову доставался перевод целой фразы.
+    $secondIsArabic = ($cells.Count -gt 1 -and (HasArabic $cells[1]))
+    if ($cells.Count -eq 2 -or -not $secondIsArabic) {
+      for ($i = $cells.Count - 1; $i -ge 1; $i--) {
+        $c = $cells[$i]
+        if (-not $c) { continue }
+        if (-not (HasCyr $c)) { continue }
+        if ($GENDER_WORDS -contains $c.ToLower()) { continue }
+        if ($tr -and $c -eq $tr) { continue }
+        if ($c -match '\*\*|`') { continue }   # пояснение с разметкой, а не перевод
+        $ru = $c; break
+      }
     }
   }
   if (-not $tr -and $cells.Count -ge 3 -and (HasCyr $cells[1]) -and $ru -ne $cells[1]) { $tr = $cells[1] }
+  # пояснение с разметкой (**жирный**, `код`) — это заметка, а не перевод слова
+  if ($ru -and $ru -match '\*\*|`') { $ru = '' }
   return @{ ru = $ru; tr = $tr }
 }
 
@@ -174,6 +185,9 @@ foreach ($pair in @(@('03 Корни', 'root'), @('00 MOC', 'moc'), @('01 Диа
   $dir = Join-Path $VaultDir $pair[0]
   if (-not (Test-Path -LiteralPath $dir)) { continue }
   Get-ChildItem -LiteralPath $dir -Filter *.md | ForEach-Object {
+    # домашние задания (ДЗ) — таблицы упражнений «слово | фраза | перевод»:
+    # перевод там у фразы, а не у слова; на сайте ДЗ не используются
+    if ($_.Name -match '^ДЗ') { return }
     $raw = ReadAll $_.FullName
     $lines = $raw -split "\r?\n"
     $header = @()
@@ -202,6 +216,8 @@ foreach ($pair in @(@('03 Корни', 'root'), @('00 MOC', 'moc'), @('01 Диа
       }
       $wcell = $cells[0]
       if ($wcell -match '^-+$' -or $wcell -match '^(Слово|Арабский|Форма|Буквы)$') { continue }
+      # описание конструкции («قَدْ + **прошедшее**») — не слово, а правило
+      if ($wcell -match '\*\*|`|\+') { continue }
       $wm = [regex]::Match($wcell, '\[\[(.+?)\]\]')
       $w = if ($wm.Success) { $wm.Groups[1].Value } else { $wcell }
       if (-not (HasArabic $w)) { continue }

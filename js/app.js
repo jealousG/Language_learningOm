@@ -865,7 +865,7 @@ function renderWordsList() {
       ar.lang = 'ar';
       ar.dir = 'rtl';
       ar.dataset.orig = e.w;
-      ar.textContent = visualWord(e.w, displayPrefs.harakat);
+      ar.textContent = visualWord(wordDisplay(e.w), displayPrefs.harakat);
 
       const wordCell = document.createElement('span');
       wordCell.className = 'words-word';
@@ -1148,7 +1148,7 @@ function renderSurahNav(story) {
 
 function showTooltip(e, wordObj) {
   const tip = document.getElementById('tooltip');
-  tip.innerHTML = `<div class="tt-ar">${wordObj.w}</div><div class="tt-ru">${wordObj.ru}</div>`;
+  tip.innerHTML = `<div class="tt-ar">${escapeHtml(wordDisplay(wordObj.w))}</div><div class="tt-ru">${escapeHtml(wordObj.ru || '')}</div>`;
   tip.classList.remove('hidden');
   moveTooltip(e);
 }
@@ -1172,7 +1172,7 @@ function hideTooltip() {
 // ------------------------- Карточка слова -------------------------
 
 function openWordCard(wordObj) {
-  document.getElementById('wcAr').textContent = wordObj.w;
+  document.getElementById('wcAr').textContent = wordDisplay(wordObj.w);
   document.getElementById('wcTr').textContent = wordObj.tr ? 'Транскрипция: ' + wordObj.tr : '';
   document.getElementById('wcRu').textContent = wordObj.ru || '';
 
@@ -2287,7 +2287,7 @@ function renderFlashcard(q) {
   const w = q.word;
   stage.innerHTML = `
     <div class="ex-type-label">Флеш-карточка</div>
-    <div class="study-question-ar" lang="ar" dir="rtl">${escapeHtml(w.w)}</div>
+    <div class="study-question-ar" lang="ar" dir="rtl">${escapeHtml(wordDisplay(w.w))}</div>
     <div id="cardAnswer" class="hidden"></div>
     <div class="study-actions" id="cardActions" style="justify-content:center;margin-top:16px">
       <button class="ctrl-btn primary" id="cardShowBtn">Показать ответ</button>
@@ -2359,7 +2359,7 @@ function renderExercise(q) {
     case 't1-choice': {
       correct = w.ru;
       options = shuffle([correct, ...pickDistractors(correct, study.story, 'ru')]);
-      prompt = `<div class="study-question-ar" lang="ar" dir="rtl">${escapeHtml(w.w)}</div>`;
+      prompt = `<div class="study-question-ar" lang="ar" dir="rtl">${escapeHtml(wordDisplay(w.w))}</div>`;
       break;
     }
     case 't2': {
@@ -2391,7 +2391,7 @@ function renderExercise(q) {
     case 't5': {
       correct = w.root;
       options = shuffle([correct, ...pickRootDistractors(correct, study.story)]);
-      prompt = `<div class="study-question-ar" lang="ar" dir="rtl">${escapeHtml(w.w)}</div>
+      prompt = `<div class="study-question-ar" lang="ar" dir="rtl">${escapeHtml(wordDisplay(w.w))}</div>
         <div class="ex-question-ru">Какой у этого слова корень?</div>`;
       isArOption = true;
       break;
@@ -2400,7 +2400,7 @@ function renderExercise(q) {
       const g = grammarQuestion(w);
       correct = g.correct;
       options = g.options;
-      prompt = `<div class="study-question-ar" lang="ar" dir="rtl">${escapeHtml(w.w)}</div>
+      prompt = `<div class="study-question-ar" lang="ar" dir="rtl">${escapeHtml(wordDisplay(w.w))}</div>
         <div class="ex-question-ru">${escapeHtml(g.q)}</div>`;
       break;
     }
@@ -2420,7 +2420,7 @@ function renderExercise(q) {
   }
 
   const optionsHtml = options.map((o, i) => isArOption
-      ? `<button class="option-btn"><span class="ob-num">${i + 1}</span><span class="ob-ar">${escapeHtml(o)}</span></button>`
+      ? `<button class="option-btn"><span class="ob-num">${i + 1}</span><span class="ob-ar">${escapeHtml(wordDisplay(o))}</span></button>`
       : `<button class="option-btn"><span class="ob-num">${i + 1}</span><span class="ob-text">${escapeHtml(o)}</span></button>`
     ).join('');
 
@@ -2533,7 +2533,7 @@ function showExerciseResult(q, ok, streak) {
     ${extra}
     <div class="study-word-info">
       <div class="ex-result ${ok ? 'ex-ok' : 'ex-bad'}">${ok ? 'Верно' : 'Неверно'}</div>
-      <div class="swi-ar">${escapeHtml(w.w)}</div>
+      <div class="swi-ar">${escapeHtml(wordDisplay(w.w))}</div>
       ${w.tr ? `<div class="swi-tr">${escapeHtml(w.tr)}</div>` : ''}
       <div class="swi-ru">${escapeHtml(w.ru || '')}</div>
       ${(!isArabicMode() && w.root && w.root !== '—') ? `<div class="srs-meta">Корень: <span class="arabic-inline">${escapeHtml(w.root)}</span></div>` : ''}
@@ -2724,7 +2724,7 @@ function renderBuilder(sentence, sentenceStory) {
       sentence.words.forEach(w => {
         const c = document.createElement('span');
         c.className = 'chip';
-        c.textContent = w.w;
+        c.textContent = wordDisplay(w.w);
         ans.appendChild(c);
       });
     }

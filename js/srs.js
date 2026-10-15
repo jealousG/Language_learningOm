@@ -358,7 +358,7 @@ const SRS = (() => {
 
     const stage = document.getElementById('srsStage');
     stage.innerHTML = `
-      <div class="srs-card-ar" lang="ar" dir="rtl">${esc(text)}</div>
+        <div class="srs-card-ar" lang="ar" dir="rtl">${esc(wordDisplay(text))}</div>
       ${word.audio ? `<div class="study-audio-wrap"><button class="study-audio-btn" id="srsAudioBtn">🔊 Прослушать слово</button></div>` : ''}
       <div class="srs-reveal-wrap"><button class="ctrl-btn primary wide" id="srsRevealBtn">Показать ответ</button></div>
       <div class="srs-answer hidden" id="srsAnswer">
