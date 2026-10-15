@@ -1575,10 +1575,15 @@ function initPlayer(story) {
   // NB: filter убирает null-src, поэтому индексы плейлиста соответствуют sIdx,
   // только если у ВСЕХ предложений есть ayahAudio. Проверяем:
   const hasAll = story.sentences.every(s => !!s.ayahAudio);
+  // Плеер показываем/скрываем на КАЖДОМ открытии текста: раньше он только
+  // скрывался, поэтому после любого текста без аудио (хадисы, намаз, истории)
+  // пропадал и в Коране — до перезагрузки страницы.
+  const bar = document.querySelector('.player-bar');
   if (!hasAll || playlist.length === 0) {
-    document.querySelector('.player-bar').classList.add('hidden');
+    if (bar) bar.classList.add('hidden');
     return;
   }
+  if (bar) bar.classList.remove('hidden');
   playlist = story.sentences.map(s => ({
     src: reciterUrl(s.ayahAudio),   // локальный файл
     cdn: cdnUrl(s.ayahAudio),        // запасной источник (CDN)
