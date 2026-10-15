@@ -1831,6 +1831,7 @@ function renderStudyDashboard() {
   }).join('');
 
   const accuracy = totalAnswers ? Math.round(correctAnswers / totalAnswers * 100) : 0;
+  const inkLi = (typeof INK !== 'undefined') ? INK.levelInfo() : null;
 
   const hardHtml = hard.length
     ? hard.slice(0, 8).map(({ text, e }) => `
@@ -1847,6 +1848,7 @@ function renderStudyDashboard() {
       <div class="stat-box"><div class="stat-num">${solid}</div><div class="stat-label">закреплено (в повторении)</div></div>
       <div class="stat-box"><div class="stat-num">${learnedWordsCount()}</div><div class="stat-label">выучено (5 верных подряд)</div></div>
       <div class="stat-box"><div class="stat-num">${totalAnswers ? accuracy + '%' : '—'}</div><div class="stat-label">точность ответов</div></div>
+      ${inkLi ? `<div class="stat-box ink-box"><div class="stat-num">${INK.total()}</div><div class="stat-label">золотых чернил · ${escapeHtml(inkLi.name)}</div></div>` : ''}
     </div>
     ${sectionsHtml}
     <p class="stats-legend">Полоса: <span class="seg-demo start"></span> взято в изучение · <span class="seg-demo solid"></span> закреплено (периодическое повторение)</p>
@@ -2099,7 +2101,8 @@ function startStudy() {
     });
   }
 
-  study = { story, sourceId, questions, idx: 0, score: 0, wrong: 0, locked: false, missed: [], learned: [] };
+  study = { story, sourceId, questions, idx: 0, score: 0, wrong: 0, locked: false, missed: [], learned: [], combo: 0 };
+  if (typeof INK !== 'undefined') INK.mark(); // прирост чернил покажем в итоге сессии
   document.getElementById('studySetup').classList.add('hidden');
   document.getElementById('studyGame').classList.remove('hidden');
   renderStudyQuestion();
@@ -2184,7 +2187,7 @@ function answerCard(q, ok) {
   if (ok) study.score++; else { study.wrong++; addMissed(q.word); }
   document.getElementById('studyScoreText').textContent = `✅ ${study.score}`;
   const streak = recordStudyAnswer(q.word.w, ok);
-  if (streak >= learnStreak() && !study.learned.some(x => x === q.word.w)) study.learned.push(q.word.w);
+  inkAnswer(ok, streak, registerLearned(q.word.w, streak));
 
   const lim = learnStreak();
   const fb = document.createElement('div');
@@ -2350,8 +2353,26 @@ function answerExercise(q, i, options, correct, clickedBtn, allBtns) {
 
   // запись результата: SRS-расписание + статистика + серия верных ответов
   const streak = recordStudyAnswer(q.word.w, ok);
-  if (streak >= learnStreak() && !study.learned.some(x => x === q.word.w)) study.learned.push(q.word.w);
+  inkAnswer(ok, streak, registerLearned(q.word.w, streak));
   showExerciseResult(q, ok, streak);
+}
+
+/** Отметить слово выученным (первое достижение порога в этой сессии). */
+function registerLearned(text, streak) {
+  if (streak >= learnStreak() && !study.learned.some(x => x === text)) {
+    study.learned.push(text);
+    return true;
+  }
+  return false;
+}
+
+/** Золотые чернила за ответ тренажёра: верный ответ + серия + выученное слово. */
+function inkAnswer(ok, streak, newlyLearned) {
+  if (typeof INK === 'undefined') return;
+  study.combo = ok ? (study.combo || 0) + 1 : 0;
+  if (ok) INK.add(INK.P.correct);
+  if (study.combo > 0 && study.combo % INK.P.comboEvery === 0) INK.add(INK.P.comboBonus);
+  if (newlyLearned) INK.add(INK.P.learned);
 }
 
 /** Единая точка результата в тренажёре: SRS + статистика + серия верных ответов. */
@@ -2469,6 +2490,9 @@ function renderStudyEnd() {
   const pct = Math.round(study.score / total * 100);
   document.getElementById('studyProgressText').textContent = 'Готово!';
   const stage = document.getElementById('studyStage');
+  // завершённая тренировка — учебный день (журнал активности) + чернила за сессию
+  if (typeof logActivity === 'function') logActivity({ trainings: 1 });
+  if (typeof INK !== 'undefined') INK.add(INK.P.session);
   const missed = study.missed || [];
   const missedHtml = missed.length ? `
       <div class="study-missed">
@@ -2481,6 +2505,7 @@ function renderStudyEnd() {
       <div class="big">${study.score} / ${total}</div>
       <div class="percent">${pct}% · ошибок: ${study.wrong || 0}</div>
       ${(study.learned && study.learned.length) ? `<div class="study-learned">Выучено слов в этой сессии: <b>${study.learned.length}</b></div>` : ''}
+      ${renderInkEarned()}
       ${missedHtml}
       <div class="study-actions" style="justify-content:center">
         <button class="ctrl-btn small primary" id="studyRetryBtn">${escapeHtml(studyContinueLabel(study.sourceId))}</button>
@@ -2490,8 +2515,13 @@ function renderStudyEnd() {
   document.getElementById('studyRetryBtn').addEventListener('click', restartStudy);
   document.getElementById('studyBackBtn').addEventListener('click', backToStudySetup);
   renderStudyDashboard(); // обновляем «Мой прогресс» сразу по завершении
-  // завершённая тренировка — учебный день (журнал активности)
-  if (typeof logActivity === 'function') logActivity({ trainings: 1 });
+}
+
+/** Строка итога: сколько золотых чернил принесла сессия. */
+function renderInkEarned() {
+  if (typeof INK === 'undefined') return '';
+  const n = INK.sinceMark();
+  return n > 0 ? `<div class="ink-earned">Золотых чернил за сессию: <b>+${n}</b></div>` : '';
 }
 
 /** Режим «собери аят / фразу»: слова в разброс, собираем порядок кликами. */
@@ -2561,6 +2591,12 @@ function renderBuilder(sentence) {
       });
     }
     document.getElementById('studyScoreText').textContent = `✅ ${study.score}`;
+    // золотые чернила: сборка — сложнее обычного ответа
+    if (typeof INK !== 'undefined') {
+      study.combo = ok ? (study.combo || 0) + 1 : 0;
+      if (ok) INK.add(INK.P.correct + INK.P.build);
+      if (study.combo > 0 && study.combo % INK.P.comboEvery === 0) INK.add(INK.P.comboBonus);
+    }
 
     // После сборки: перевод + озвучка (если есть) + «Дальше»
     const info = document.createElement('div');

@@ -1005,6 +1005,47 @@ details.stats-section summary:hover { background: var(--paper-deep); }
   font-size: 26px; font-weight: 600; margin: 0;
 }
 
+/* золотые чернила: уровень и прогресс в шапке Главной */
+.ink-line { display: flex; align-items: baseline; gap: 10px; margin: 8px 0 0; }
+.ink-level {
+  font-family: var(--font-serif);
+  font-size: 17px; font-weight: 600; color: var(--gold);
+}
+.ink-amount { font-size: 12.5px; color: var(--ink-muted); }
+.ink-bar {
+  height: 4px; margin-top: 7px;
+  border-radius: 2px; background: var(--paper-deep); overflow: hidden;
+}
+.ink-fill {
+  height: 100%; border-radius: 2px;
+  background: linear-gradient(90deg, #d8b25e, var(--gold));
+  transition: width .4s ease;
+}
+.ink-next { margin: 5px 0 0; font-size: 11.5px; color: var(--ink-muted); }
+
+/* итог сессии */
+.ink-earned {
+  margin-top: 10px; font-size: 14px; color: #7c5f22;
+  background: var(--gold-soft); border-radius: 10px;
+  padding: 8px 14px; display: inline-block;
+}
+.ink-earned b { color: #5d4512; }
+
+/* уведомление о новом уровне */
+.ink-toast {
+  position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%);
+  z-index: 60; padding: 12px 24px;
+  border: 1px solid var(--gold); border-radius: 12px;
+  background: var(--night); color: var(--gold-soft);
+  font-weight: 600; box-shadow: 0 10px 30px rgba(16, 39, 32, .35);
+  animation: inkToastIn .35s ease;
+}
+.ink-toast b { color: #fffdf5; }
+@keyframes inkToastIn {
+  from { opacity: 0; transform: translate(-50%, 12px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
 /* сетка дней: столбец = неделя (Пн…Вс) */
 .heat-wrap { overflow-x: auto; padding-bottom: 4px; }
 .heat-months {

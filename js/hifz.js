@@ -87,6 +87,8 @@ const HIFZ = (() => {
     if (typeof logActivity === 'function') {
       logActivity({ reviews: 1, correct: g !== 'again' ? 1 : 0 });
     }
+    // золотые чернила: аят оценён не «Не помню»
+    if (typeof INK !== 'undefined' && g !== 'again') INK.add(INK.P.ayah);
   }
 
   // ------------------------- счётчики -------------------------
@@ -373,6 +375,7 @@ const HIFZ = (() => {
     if (!empty && typeof logActivity === 'function') {
       logActivity({ trainings: 1 }); // завершённая тренировка аятов — учебный день
     }
+    if (!empty && typeof INK !== 'undefined') INK.add(INK.P.session); // золотые чернила за сессию
     const stage = document.getElementById('hifzStage');
     stage.innerHTML = `
       <div class="srs-summary">

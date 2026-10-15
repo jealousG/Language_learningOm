@@ -346,6 +346,51 @@
     }
   }
 
+  // ================= Часть 3: золотые чернила =================
+
+  function inkTests() {
+    record(typeof INK === 'object' && typeof INK.add === 'function', 'Модуль INK загружен');
+    if (typeof INK === 'undefined') return;
+
+    // чистая логика уровней (пороги включительно)
+    eq('INK: 0 → «Ученик»', INK.levelIndex(0), 0);
+    eq('INK: 149 → уровень 0', INK.levelIndex(149), 0);
+    eq('INK: 150 → уровень 1 (Переписчик)', INK.levelIndex(150), 1);
+    eq('INK: 450 → уровень 2 (Калист)', INK.levelIndex(450), 2);
+    eq('INK: 1000 → уровень 3 (Чтец)', INK.levelIndex(1000), 3);
+    eq('INK: 6000 → высший уровень', INK.levelIndex(6000), INK.LEVELS.length - 1);
+    eq('INK: потолок уровня', INK.levelIndex(999999), INK.LEVELS.length - 1);
+
+    const names = INK.LEVELS.map(l => l.name);
+    eq('INK: имена уровней уникальны', new Set(names).size, names.length);
+    const mins = INK.LEVELS.map(l => l.min);
+    eq('INK: пороги возрастают', JSON.stringify(mins), JSON.stringify([...mins].sort((a, b) => a - b)));
+
+    // начисления: с бэкапом реального хранилища чернил
+    const KEY = 'arabic-reader-ink-v1';
+    let backup = null;
+    try { backup = localStorage.getItem(KEY); } catch (e) { /* нет доступа — тесты ниже пропустим */ }
+    try {
+      const before = INK.total();
+      INK.mark();
+      INK.add(INK.P.correct);
+      INK.add(INK.P.comboBonus);
+      eq('INK: add аккумулирует', INK.total() - before, INK.P.correct + INK.P.comboBonus);
+      eq('INK: sinceMark считает прирост сессии', INK.sinceMark(), INK.P.correct + INK.P.comboBonus);
+      INK.add(0);
+      INK.add(-5);
+      eq('INK: add игнорирует неположительные', INK.sinceMark(), INK.P.correct + INK.P.comboBonus);
+      const li = INK.levelInfo();
+      record(li.pct >= 0 && li.pct <= 100, 'INK: прогресс уровня 0–100%', li.pct);
+      record(typeof li.name === 'string' && li.name.length > 0, 'INK: уровень имеет имя', li.name);
+    } finally {
+      try {
+        if (backup === null) localStorage.removeItem(KEY);
+        else localStorage.setItem(KEY, backup);
+      } catch (e) { /* игнорируем */ }
+    }
+  }
+
   // Запуск: сначала синхронные тесты ядра, затем асинхронные тесты хранилища
   try {
     coreTests();
@@ -356,6 +401,11 @@
     wordsTests();
   } catch (e) {
     record(false, 'Тесты раздела «Слова» выполнились без исключений', e.message);
+  }
+  try {
+    inkTests();
+  } catch (e) {
+    record(false, 'Тесты золотых чернил выполнились без исключений', e.message);
   }
   storageTests();
 })();

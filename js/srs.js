@@ -296,6 +296,7 @@ const SRS = (() => {
     const queue = buildQueue();
     if (!queue.length) { renderScreen(); return; }
     session = { queue, idx: 0, revealed: false, stats: { again: 0, hard: 0, good: 0, easy: 0 } };
+    if (typeof INK !== 'undefined') INK.mark();
     document.getElementById('srsOverviewPanel').classList.add('hidden');
     const panel = document.getElementById('srsSessionPanel');
     panel.classList.remove('hidden');
@@ -306,6 +307,8 @@ const SRS = (() => {
     const s = session.stats;
     const done = session.queue.length;
     const remaining = counts().due;
+    if (typeof INK !== 'undefined') INK.add(INK.P.session); // чернила за завершённую сессию
+    const inkEarned = (typeof INK !== 'undefined') ? INK.sinceMark() : 0;
     const stage = document.getElementById('srsStage');
     stage.innerHTML = `
       <div class="srs-summary">
@@ -317,6 +320,7 @@ const SRS = (() => {
           <span class="grade-hard">Трудно: ${s.hard}</span> ·
           <span class="grade-again">Не помню: ${s.again}</span>
         </div>
+        ${inkEarned > 0 ? `<div class="ink-earned">Золотых чернил за сессию: <b>+${inkEarned}</b></div>` : ''}
         ${remaining > 0
           ? `<p class="study-hint">Осталось на сегодня: ${remaining}. Забытые слова вернутся через несколько минут — продолжите позже.</p>`
           : '<p class="study-hint">На сегодня всё повторено 👍</p>'}
@@ -418,6 +422,11 @@ const SRS = (() => {
     const text = session.queue[session.idx];
     answerWord(text, g);
     session.stats[g]++;
+    // золотые чернила: «Хорошо/Легко» — верный ответ, «Трудно» — половинный
+    if (typeof INK !== 'undefined') {
+      if (g === 'good' || g === 'easy') INK.add(INK.P.correct);
+      else if (g === 'hard') INK.add(1);
+    }
     if (g === 'again') session.queue.push(text); // повтор в текущей сессии
     nextCard();
   }
@@ -591,6 +600,7 @@ const SRS = (() => {
         queue: texts.slice(), idx: 0, revealed: false,
         stats: { again: 0, hard: 0, good: 0, easy: 0 }
       };
+      if (typeof INK !== 'undefined') INK.mark();
       document.getElementById('srsOverviewPanel').classList.add('hidden');
       document.getElementById('srsSessionPanel').classList.remove('hidden');
       renderCard();
@@ -606,6 +616,7 @@ const SRS = (() => {
       const queue = c.newAvailable > 0 ? pickNewWords(c.newAvailable) : [];
       if (!queue.length) { renderScreen(); return false; }
       session = { queue: queue.slice(), idx: 0, revealed: false, stats: { again: 0, hard: 0, good: 0, easy: 0 } };
+      if (typeof INK !== 'undefined') INK.mark();
       document.getElementById('srsOverviewPanel').classList.add('hidden');
       document.getElementById('srsSessionPanel').classList.remove('hidden');
       renderCard();

@@ -188,6 +188,18 @@ function renderHome() {
   const todayDate = new Date().toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' });
   const lastStory = haveSrs ? SRS.getLastStory() : null; // для «Продолжить чтение»
   const isIslam = (typeof getMode === 'function') ? getMode() === 'islam' : true;
+  const inkLi = (typeof INK !== 'undefined') ? INK.levelInfo() : null;
+  const inkHtml = inkLi ? `
+      <div class="ink-line">
+        <span class="ink-level">${escapeHtml(inkLi.name)}</span>
+        <span class="ink-amount">${INK.total()} золотых чернил</span>
+      </div>
+      <div class="ink-bar" role="img" aria-label="Прогресс уровня: ${inkLi.pct}%">
+        <div class="ink-fill" style="width:${inkLi.pct}%"></div>
+      </div>
+      <p class="ink-next">${inkLi.nextName
+        ? 'до «' + escapeHtml(inkLi.nextName) + '»: ' + inkLi.toNext
+        : 'высший уровень достигнут'}</p>` : '';
 
   const countersHtml = isIslam
     ? `${sc.due} слов и ${hc.due} аятов ждут повторения${sc.newAvailable ? ' · доступно новых слов: ' + sc.newAvailable : ''}`
@@ -229,6 +241,7 @@ function renderHome() {
     <section class="home-heat">
       <div class="heat-head">
         <p class="hero-date">${todayDate}${streak > 0 ? ' · серия ' + streak + ' ' + (streak === 1 ? 'день' : 'дн.') : ''}</p>
+        ${inkHtml}
         <h3 class="hero-title">Моя практика</h3>
       </div>
       ${renderHeatmap(a)}
