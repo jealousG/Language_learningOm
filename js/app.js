@@ -783,6 +783,8 @@ function renderWordsList() {
     if (e.ru && e.ru.toLowerCase().includes(q)) return true;
     if (e.tr && e.tr.toLowerCase().includes(q)) return true;
     if (qNorm && wordsNorm(e.w).includes(qNorm)) return true;
+    // ищем и по формам, вошедшим в основу (أُخْتُكُمْ находится, хотя показано «أخت»)
+    if (qNorm && (e.tokens || []).some(t => wordsNorm(t).includes(qNorm))) return true;
     return false;
   };
 
@@ -1768,22 +1770,33 @@ function escapeHtml(s) {
 }
 
 /** Уникальные слова истории с контекстом первого вхождения (для пропусков в тексте). */
+/**
+ * Уникальные слова текста, сгруппированные по ОСНОВЕ (лемме): аффиксные формы
+ * одного слова дают одну запись, и тренажёр спрашивает саму основу
+ * (أُخْتُكُمْ → أُخْت «сестра»).
+ */
 function uniqueWordItems(story) {
   const seen = new Set();
   const items = [];
   story.sentences.forEach(sent => sent.words.forEach((w, i) => {
-    if (seen.has(w.w)) return;
-    seen.add(w.w);
-    items.push({ word: w, sentence: sent, gapIndex: i });
+    const key = wordBaseKey(w);
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    items.push({ word: baseWord(w), sentence: sent, gapIndex: i });
   }));
   return items;
 }
 
-/** Список уникальных значений поля ('w' | 'ru') по истории (или [] для null). */
+/**
+ * Список уникальных значений поля по истории (или [] для null).
+ * Для 'w' возвращаются ОСНОВЫ слов — варианты ответа в тренажёре должны быть
+ * того же вида, что и правильный ответ (иначе «сестра» спорила бы с «ваша сестра»).
+ */
 function collectFieldValues(story, field) {
   const set = new Set();
   if (story) story.sentences.forEach(s => s.words.forEach(w => {
-    if (w[field]) set.add(w[field]);
+    const v = (field === 'w') ? wordBase(w) : w[field];
+    if (v) set.add(v);
   }));
   return [...set];
 }
@@ -2165,7 +2178,7 @@ function startStudy() {
   // глава: берём только слова, впервые встречающиеся в ней, — уже пройденные не повторяем
   if (!isNew && story.chapterId && typeof wordOwnerMap === 'function') {
     const owner = wordOwnerMap();
-    pool = pool.filter(it => owner.get(wordsNorm(it.word.w)) === story.chapterId);
+    pool = pool.filter(it => owner.get(wordBaseKey(it.word)) === story.chapterId);
   }
 
   if (!pool.length) {
@@ -2383,7 +2396,9 @@ function renderExercise(q) {
       break;
     }
     case 't4': {
-      correct = w.w;
+      // пропуск в предложении: верный ответ — ТА форма, что стоит в тексте
+      const inText = (q.sentence.words[q.gapIndex] || {}).w;
+      correct = inText || w.w;
       const siblings = [...new Set(q.sentence.words.filter(x => x.w !== correct).map(x => x.w))];
       let pool = siblings.filter(v => Math.abs(v.length - correct.length) <= 4);
       if (pool.length < 3) pool = siblings;

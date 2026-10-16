@@ -140,6 +140,7 @@ function Get-Section([string[]]$lines, [string[]]$names) {
 #   2) 03 Корни, 00 MOC, 01 Диалоги, 04 Грамматика — таблицы и списки слов с переводом.
 $dict = @{}
 $dictPrio = @{}
+$baseHint = @{}         # ручные исключения: нормализованная форма → своя основа (huna-extra-words.json)
 $dictExact = @{}       # ключ — слово КАК ЕСТЬ (с огласовками): различает омографы (مِنْ / مَنْ)
 $dictExactPrio = @{}
 $dictInt = @{}         # ключ — слово до последней буквы (без конечной огласовки)
@@ -235,9 +236,37 @@ if (Test-Path -LiteralPath $extraPath) {
   $n = 0
   foreach ($e in $extra) {
     AddDict $e.w $e.tr $e.ru $e.pos '' 4
+    # ручное указание основы (для исключений: форма сама себе основа)
+    if ($e.base) { $baseHint[(Norm $e.w)] = $e.base }
     $n++
   }
   Write-Output ("extra words loaded: " + $n)
+}
+
+# 3.5) словарь глав курса (таблицы «Новые слова главы» из 00 MOC).
+#      Это и есть список ОСНОВНЫХ слов курса: по нему определяется основа форм
+#      (أَخِي → أخ, اِسْمِي → اسم), поэтому формы не дублируются в «Словах».
+$mocDirPre = Join-Path $VaultDir '00 MOC'
+if (Test-Path -LiteralPath $mocDirPre) {
+  $nPre = 0
+  Get-ChildItem -LiteralPath $mocDirPre -Filter *.md | Where-Object { $_.Name -match '^Том \d - Глава \d+\.md$' } | ForEach-Object {
+    $raw = ReadAll $_.FullName
+    $inSec = $false
+    foreach ($l in ($raw -split "\r?\n")) {
+      $t = $l.Trim()
+      if ($t -match '^#{1,6}\s') { $inSec = ($t -match 'Новые слова'); continue }
+      if (-not $inSec) { continue }
+      $mm = [regex]::Match($t, '^\|\s*(.+?)\s*\|\s*(.*?)\s*\|\s*(.*?)\s*\|\s*(.*?)\s*\|\s*$')
+      if (-not $mm.Success) { continue }
+      $wRaw = $mm.Groups[1].Value
+      if ($wRaw -match '^Слово$|^-+$') { continue }
+      $wm = [regex]::Match($wRaw, '\[\[(.+?)\]\]')
+      $w = if ($wm.Success) { $wm.Groups[1].Value } else { $wRaw }
+      AddDict $w $mm.Groups[2].Value $mm.Groups[3].Value '' '' 3
+      $nPre++
+    }
+  }
+  Write-Output ("chapter vocabulary loaded: " + $nPre)
 }
 
 # ------------------------- проверка словаря -------------------------
@@ -391,6 +420,87 @@ function SpecialWord([string]$tok) {
   return $null
 }
 
+# Основы для группировки форм одного слова (أُخْتِي / أُخْتُكُمْ / وَالْأُخْتِ → أُخْت).
+# Снимаем ТОЛЬКО местоименные суффиксы и предлоги/артикль: падежные и числовые
+# окончания (ا، ات، ين، ون، ان) не трогаем, иначе «كتاب» слилось бы с «كتب».
+$BASE_PREFIXES = @('وال', 'فال', 'بال', 'كال', 'لل', 'ال', 'و', 'ف', 'ب', 'ل', 'ك')
+$BASE_SUFFIXES = @('هما', 'هم', 'هن', 'كما', 'كم', 'كن', 'ها', 'نا', 'ه', 'ك', 'ي')
+
+function WordBase([string]$core, $res) {
+  if ($res -and ($res.pre -or $res.suf) -and $res.hit.w) { return $res.hit.w }
+  $key = Norm $core
+  if (-not $key) { return $core }
+  # «ه» в конце — это ta marbuta (ة), а не местоимение «его»: иначе
+  # «رِحْلةً» (поездка) слилось бы с глаголом «رَحَلَ» (уезжать)
+  $taM = ($core -match '\u0629[\u064B-\u0652\u0670]*$')
+  # кандидаты храним по ключу статьи: ta-marbuta-вариант может дать тот же
+  # кандидат дважды, а дубликат выглядел бы как «неоднозначный разбор»
+  $cands = @{}
+  foreach ($p in @('') + $BASE_PREFIXES) {
+    if ($p -and -not $key.StartsWith($p)) { continue }
+    if ($p -and $key.Length -le $p.Length + 1) { continue }
+    $rest = if ($p) { $key.Substring($p.Length) } else { $key }
+    foreach ($s in @('') + $BASE_SUFFIXES) {
+      if ($s -eq 'ه' -and $taM) { continue }
+      if ($s -and -not $rest.EndsWith($s)) { continue }
+      if ($s -and $rest.Length -le $s.Length + 1) { continue }
+      if (-not ($p -or $s)) { continue }   # нужен реально снятый аффикс
+      $stem = if ($s) { $rest.Substring(0, $rest.Length - $s.Length) } else { $rest }
+      if ($stem.Length -lt 2) { continue }
+      # после снятия ПРИСТАВКИ основа должна быть не короче 3 букв: иначе
+      # «كان» распалось бы на ك + ان и слилось с частицей إن (совсем другое слово)
+      if ($p -and $stem.Length -lt 3) { continue }
+      # при присоединении суффикса ta marbuta ة переходит в ت
+      # (صَدِيقَة + ي = صَدِيقَتِي), поэтому пробуем и такой вариант основы
+      foreach ($cand in @($stem, ($stem -replace 'ت$', 'ه'))) {
+        if ($cand.Length -lt 2) { continue }
+        if (-not $cands.ContainsKey($cand) -and $dict.ContainsKey($cand) -and $dict[$cand].w -and $dict[$cand].ru) {
+          $cands[$cand] = @{ hit = $dict[$cand]; stem = $stem.Length }
+        }
+      }
+    }
+  }
+  if (-not $cands.Count) { return $core }
+  # разбор должен быть однозначным: «وَفَّقَهُ» можно прочитать и как وفق+ه
+  # (успех + его), и как و+فقه (и + понимать) — при равенстве основу не угадываем
+  $vals = @($cands.Values)
+  $max = 0
+  foreach ($c in $vals) { if ($c.stem -gt $max) { $max = $c.stem } }
+  $top = @($vals | Where-Object { $_.stem -eq $max })
+  if ($top.Count -ne 1) { return $core }
+  return $top[0].hit.w
+}
+
+# Дописать в объект слова основу (лемму), если она отличается от самой формы.
+# Используется и для слов диалогов/текстов, и для словаря главы.
+function AddBaseTo($obj, [string]$core) {
+  $key = Norm $core
+  if (-not $key) { return }
+  # ручное исключение: форма сама себе основа (например, «وَفَّقَهُ»)
+  if ($baseHint.ContainsKey($key)) {
+    $hb = $baseHint[$key]
+    if ($hb -and (Norm $hb) -ne $key) { $obj.base = $hb; $be = $dict[(Norm $hb)]; if ($be -and $be.ru) { $obj.baseRu = $be.ru } }
+    return
+  }
+  $res = $null
+  if ($dictExact.ContainsKey($core)) { $res = @{ hit = $dictExact[$core]; pre = ''; suf = '' } }
+  if (-not $res) {
+    $ik = KeyInternal $core
+    if ($ik -and $dictInt.ContainsKey($ik)) { $res = @{ hit = $dictInt[$ik]; pre = ''; suf = '' } }
+  }
+  if (-not $res) { $res = Lookup $key $core ($core -match '\u0629[\u064B-\u0652\u0670]*$') }
+  $base = WordBase $core $res
+  $bkey = Norm $base
+  if (-not $bkey -or $bkey -eq $key) { return }
+  $obj.base = $base
+  $be = $dict[$bkey]
+  if ($be) {
+    if ($be.ru) { $obj.baseRu = $be.ru }
+    if ($be.tr) { $obj.baseTr = $be.tr }
+    if ($be.root) { $obj.baseRoot = $be.root }
+  }
+}
+
 function MakeWords([string]$text) {
   $words = @()
   foreach ($tok in ($text -split '\s+')) {
@@ -435,6 +545,8 @@ function MakeWords([string]$text) {
       if (-not $missingCtx.ContainsKey($key)) { $missingCtx[$key] = @() }
       if ($missingCtx[$key].Count -lt 2 -and $text) { $missingCtx[$key] += $text.Trim() }
     }
+    # ОСНОВА (лемма): по ней раздел «Слова» и тренажёр группируют формы
+    AddBaseTo $obj $core
     if ($trail) { $obj.punct = $trail }
     $words += $obj
   }
@@ -542,6 +654,7 @@ Get-ChildItem -LiteralPath $mocDir -Filter *.md | Where-Object { $_.Name -match 
     $w = if ($wm.Success) { $wm.Groups[1].Value } else { $wRaw }
     $obj = [ordered]@{ w = $w; tr = $mm.Groups[2].Value; ru = $mm.Groups[3].Value }
     $g = $mm.Groups[4].Value; if ($g -and $g -ne '-') { $obj.gender = $g }
+    AddBaseTo $obj $w   # основа — чтобы формы одного слова не дублировались
     $words += $obj
   }
 

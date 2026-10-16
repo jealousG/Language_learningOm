@@ -57,7 +57,42 @@ function wordStudyStatus(tokens, stats, cards, lim) {
 }
 
 /**
- * Карта «нормализованная форма → id главы, где слово встречается ВПЕРВЫЕ».
+ * Основа слова (лемма) для группировки форм одного слова:
+ * أُخْتِي / أُخْتُكُمْ / وَالْأُخْتِ → أُخْت (поле `base` из импортёра).
+ * Если основы нет — форма остаётся сама собой.
+ */
+function wordBase(word) {
+  if (!word) return '';
+  if (typeof word === 'string') return word;
+  return word.base || word.w || '';
+}
+
+/** Ключ группировки: нормализованная основа (или сама форма). */
+function wordBaseKey(word) {
+  return wordsNorm(wordBase(word));
+}
+
+/**
+ * Слово-основа для показа и тренажёра: та же форма, но с основой вместо
+ * аффиксной формы (أُخْتُكُمْ → أُخْت «сестра»). Без основы возвращается как есть.
+ */
+function baseWord(word) {
+  if (!word || !word.w) return word;
+  if (!word.base) return word;
+  const out = { w: word.base };
+  const tr = word.baseTr || word.tr;
+  const ru = word.baseRu || word.ru;
+  if (tr) out.tr = tr;
+  if (ru) out.ru = ru;
+  if (word.pos) out.pos = word.pos;
+  const root = word.baseRoot || word.root;
+  if (root) out.root = root;
+  if (word.audio) out.audio = word.audio;
+  return out;
+}
+
+/**
+ * Карта «основа слова → id главы, где слово встречается ВПЕРВЫЕ».
  * Главы курса идут сквозной нумерацией (1…16 по обоим томам), поэтому слово
  * принадлежит ровно одной главе — в остальных оно уже не «новое».
  */
@@ -68,7 +103,7 @@ function wordOwnerMap(books) {
   chapters.sort((a, b) => ((a.ch.no ?? 0) - (b.ch.no ?? 0)) || (a.bi - b.bi));
   const map = new Map();
   const note = (w, chId) => {
-    const k = wordsNorm(w && w.w);
+    const k = wordBaseKey(w);
     if (k && !map.has(k)) map.set(k, chId);
   };
   chapters.forEach(({ ch }) => {
@@ -80,7 +115,9 @@ function wordOwnerMap(books) {
 
 /**
  * Уникальные слова главы (из диалогов/текстов + словарь главы),
- * сгруппированные по нормализованной форме. Возвращает [{key, w, tr, ru, pos, tokens, status}].
+ * сгруппированные по ОСНОВЕ слова: аффиксные формы одной леммы
+ * (أُخْتِي / أُخْتُكُمْ / وَالْأُخْتِ) дают одну запись «أخت — сестра».
+ * Возвращает [{key, w, tr, ru, pos, tokens, status}].
  * Если передан ownerMap — остаются только слова, впервые встречающиеся в ЭТОЙ главе
  * (иначе одно и то же слово «училось» бы заново в каждой следующей главе).
  */
@@ -88,17 +125,29 @@ function chapterWordEntries(ch, stats, cards, lim, ownerMap) {
   const map = new Map();
   const add = (w) => {
     if (!w || !w.w) return;
-    const key = wordsNorm(w.w);
+    const key = wordBaseKey(w);
     if (!key) return;
+    const base = wordBase(w);
     let e = map.get(key);
     if (!e) {
-      e = { key, w: w.w, tr: w.tr || '', ru: w.ru || '', pos: w.pos || w.gender || '', tokens: [] };
+      e = {
+        key,
+        w: base,
+        tr: w.baseTr || w.tr || '',
+        ru: w.baseRu || w.ru || '',
+        pos: w.pos || w.gender || '',
+        root: w.baseRoot || w.root || '',
+        tokens: []
+      };
       map.set(key, e);
     }
     if (e.tokens.indexOf(w.w) < 0) e.tokens.push(w.w);
-    if (!e.ru && w.ru) e.ru = w.ru;
-    if (!e.tr && w.tr) e.tr = w.tr;
+    // в tokens входит и сама основа: тренажёр записывает результат по ней
+    if (e.tokens.indexOf(base) < 0) e.tokens.push(base);
+    if (!e.ru && (w.baseRu || w.ru)) e.ru = w.baseRu || w.ru;
+    if (!e.tr && (w.baseTr || w.tr)) e.tr = w.baseTr || w.tr;
     if (!e.pos && (w.pos || w.gender)) e.pos = w.pos || w.gender;
+    if (!e.root && (w.baseRoot || w.root)) e.root = w.baseRoot || w.root;
   };
   (ch.dialogues || []).forEach(d => (d.sentences || []).forEach(s => (s.words || []).forEach(add)));
   (ch.words || []).forEach(add);

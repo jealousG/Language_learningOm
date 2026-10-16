@@ -301,9 +301,31 @@
       record(false, 'wordDisplay загружен');
     }
 
+    // Лемматизация: формы одного слова (с приставками/местоименными суффиксами)
+    // дают одну запись — основа берётся из словарной статьи (поле base).
+    if (typeof wordBase === 'function') {
+      eq('wordBase: форма с суффиксом → основа', wordBase({ w: 'أُخْتُكُمْ', base: 'أخت' }), 'أخت');
+      eq('wordBase: без основы → сама форма', wordBase({ w: 'كِتَابٌ' }), 'كِتَابٌ');
+      eq('wordBaseKey: формы одной основы совпадают',
+        wordBaseKey({ w: 'أُخْتِي', base: 'أخت' }) === wordBaseKey({ w: 'أخت' }), true);
+      const bw = baseWord({ w: 'أُخْتُكُمْ', base: 'أخت', baseRu: 'сестра', baseTr: 'ухт', ru: 'ваша сестра', tr: 'ухтукум' });
+      eq('baseWord: показываем основу', bw.w, 'أخت');
+      eq('baseWord: перевод основы, не формы', bw.ru, 'сестра');
+      eq('baseWord: без основы объект не меняется', baseWord({ w: 'كِتَابٌ' }).w, 'كِتَابٌ');
+    } else {
+      record(false, 'wordBase загружен');
+    }
+
     const ch = (typeof HUNA_DATA !== 'undefined' && HUNA_DATA.books && HUNA_DATA.books[0] && HUNA_DATA.books[0].chapters[0]) || null;
     if (ch) {
       const entries = chapterWordEntries(ch, {}, {}, 3);
+      // «сестра» в главе «Знакомство» была 4 раза (أخت, أُخْتِي, أُخْتُكُمْ, وَالْأُخْتِ)
+      const sisters = entries.filter(e => /أُخْت|أخت/.test(e.w));
+      eq('лемматизация: «сестра» — одна запись в главе', sisters.length, 1);
+      if (sisters.length === 1) {
+        eq('лемматизация: показана основа «أخت»', sisters[0].w, 'أخت');
+        record(sisters[0].tokens.length >= 2, 'лемматизация: формы собраны в tokens', sisters[0].tokens.join(','));
+      }
       record(entries.length > 0, 'chapterWordEntries: слова главы найдены', entries.length);
       const keys = entries.map(e => e.key);
       eq('chapterWordEntries: ключи уникальны', [...new Set(keys)].length, keys.length);
