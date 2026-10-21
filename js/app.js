@@ -998,6 +998,16 @@ function renderStory(story) {
       badge.setAttribute('aria-label', `Прослушать с аята ${sentence.ayah}`);
       badge.addEventListener('click', () => playFromAyah(sIdx));
       sentenceDiv.appendChild(badge);
+    } else if (sentence.audio) {
+      // озвучка материала («Хуна Арабия»): клик — проиграть эту реплику
+      const badge = document.createElement('button');
+      badge.type = 'button';
+      badge.className = 'ayah-num play-badge';
+      badge.textContent = '▶';
+      badge.title = 'Прослушать эту реплику';
+      badge.setAttribute('aria-label', 'Прослушать эту реплику');
+      badge.addEventListener('click', () => playFromAyah(sIdx));
+      sentenceDiv.appendChild(badge);
     }
 
     sentence.words.forEach((wordObj, wIdx) => {
@@ -1475,13 +1485,13 @@ function renderLevelsModal() {
 
 // ------------------------- Аудио отдельного слова -------------------------
 
-function playWordAudio(src) {
+function playWordAudio(src, errText) {
   stopAllAudio('word'); // одно аудио за раз: глушим плеер, Хифз и свою запись
   const a = new Audio(src);
   wordAudio = a;
   a.addEventListener('ended', () => { if (wordAudio === a) wordAudio = null; });
   a.play().catch(err => {
-    showPlayerStatus('Не удалось воспроизвести слово. Проверьте интернет-соединение.');
+    showPlayerStatus(errText || 'Не удалось воспроизвести слово. Проверьте интернет-соединение.');
   });
 }
 
@@ -1568,30 +1578,37 @@ function showPlayerStatus(text, isError) {
   el.style.color = isError ? '#b3261e' : 'var(--accent)';
 }
 
-/** Подготовка плейлиста: собираем аудио аятов и узнаём их длительности. */
+/**
+ * Подготовка плейлиста: собираем аудио предложений и узнаём их длительности.
+ * Два вида аудио: аяты Корана (`ayahAudio` — локальный файл чтеца + CDN-фолбэк)
+ * и озвучка материалов «Хуна Арабия» (`audio` — обычный локальный mp3).
+ */
 function initPlayer(story) {
   resetPlayerUI();
-  playlist = story.sentences
-    .map(s => ({ src: s.ayahAudio || null, duration: 0 }))
-    .filter(s => s !== null);
-  // NB: filter убирает null-src, поэтому индексы плейлиста соответствуют sIdx,
-  // только если у ВСЕХ предложений есть ayahAudio. Проверяем:
-  const hasAll = story.sentences.every(s => !!s.ayahAudio);
   // Плеер показываем/скрываем на КАЖДОМ открытии текста: раньше он только
   // скрывался, поэтому после любого текста без аудио (хадисы, намаз, истории)
   // пропадал и в Коране — до перезагрузки страницы.
+  const hasAll = story.sentences.every(s => !!(s.ayahAudio || s.audio));
   const bar = document.querySelector('.player-bar');
-  if (!hasAll || playlist.length === 0) {
+  if (!hasAll || !story.sentences.length) {
     if (bar) bar.classList.add('hidden');
     return;
   }
   if (bar) bar.classList.remove('hidden');
-  playlist = story.sentences.map(s => ({
-    src: reciterUrl(s.ayahAudio),   // локальный файл
-    cdn: cdnUrl(s.ayahAudio),        // запасной источник (CDN)
-    triedCdn: false,
-    duration: 0
-  }));
+  // индексы плейлиста = индексы предложений (у всех есть аудио)
+  playlist = story.sentences.map(s => s.ayahAudio
+    ? {
+        src: reciterUrl(s.ayahAudio),  // локальный файл чтеца
+        cdn: cdnUrl(s.ayahAudio),      // запасной источник (CDN)
+        triedCdn: false,
+        duration: 0
+      }
+    : {
+        src: encodeURI(s.audio),       // озвучка материала (локальный mp3)
+        cdn: null,
+        triedCdn: false,
+        duration: 0
+      });
 
   // Узнаём длительности через скрытые Audio с preload=metadata
   metaProbeAudios.forEach(a => { a.src = ''; });
@@ -1652,7 +1669,8 @@ function globalPosition() {
 /** Перейти к произвольной позиции на общей шкале. */
 function seekToGlobal(t) {
   if (!playlist.length) return;
-  t = Math.max(0, Math.min(t, totalDuration - 0.05));
+  if (!isFinite(t)) t = 0;   // длительности ещё не измерены
+  t = Math.max(0, Math.min(t, Math.max(0, totalDuration - 0.05)));
   let idx = 0;
   for (let i = 0; i < playlist.length; i++) {
     if (t >= starts[i]) idx = i;
@@ -1688,7 +1706,20 @@ function loadAyah(idx, offset) {
 
 function playFromAyah(sIdx) {
   closeWordCard();
-  seekToGlobal(starts[sIdx] || 0);
+  // если плеер не собран (материал озвучен не полностью) — играем только эту реплику
+  if (!playlist.length) {
+    const s = (currentStory && currentStory.sentences) ? currentStory.sentences[sIdx] : null;
+    if (s && s.audio) playWordAudio(encodeURI(s.audio), 'Не удалось воспроизвести озвучку.');
+    return;
+  }
+  // длительности ещё измеряются (starts пуст) — грузим эту реплику напрямую
+  if (!isFinite(starts[sIdx])) {
+    loadAyah(sIdx, 0);
+    highlightAyah(sIdx);
+    playPlayer();
+    return;
+  }
+  seekToGlobal(starts[sIdx]);
   playPlayer();
 }
 
@@ -1700,8 +1731,8 @@ function playPlayer() {
   if (!playerAudio.src) {
     loadAyah(0, 0);
   }
-  // если стоим в самом конце — начинаем сначала
-  if (globalPosition() >= totalDuration - 0.1) {
+  // если стоим в самом конце — начинаем сначала (когда длительности уже измерены)
+  if (totalDuration > 0 && globalPosition() >= totalDuration - 0.1) {
     loadAyah(0, 0);
   }
   playerAudio.play().catch(err => {

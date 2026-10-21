@@ -18,6 +18,32 @@ param(
 $ErrorActionPreference = 'Stop'
 $utf8bom = New-Object System.Text.UTF8Encoding($true)
 
+# ------------------------- озвучка материалов -------------------------
+# Озвучка лежит в <корень проекта>\audio\<папка тома>\<id материала>-<номер>.mp3,
+# например audio\Huna Arabia 2 том\huna2-g9-d1-3.mp3 (третья реплика диалога 1).
+# Папка тома определяется по цифре в имени (audio\Huna Arabia 2 том -> том 2).
+$RepoRoot = Split-Path -Parent $PSScriptRoot
+$AudioDirs = @{}
+$audioRoot = Join-Path $RepoRoot 'audio'
+if (Test-Path -LiteralPath $audioRoot) {
+  Get-ChildItem -LiteralPath $audioRoot -Directory | ForEach-Object {
+    $m = [regex]::Match($_.Name, '(\d)')
+    if ($m.Success -and -not $AudioDirs.ContainsKey($m.Groups[1].Value)) { $AudioDirs[$m.Groups[1].Value] = $_.Name }
+  }
+}
+
+# Проставить предложениям относительный путь к озвучке (если файл существует).
+function AttachSentenceAudio($sents, [string]$matId, [int]$vol) {
+  $folder = $AudioDirs["$vol"]
+  if (-not $folder) { return 0 }
+  $n = 0
+  for ($i = 0; $i -lt $sents.Count; $i++) {
+    $rel = "audio/$folder/$matId-$($i + 1).mp3"
+    if (Test-Path -LiteralPath (Join-Path $RepoRoot $rel)) { $sents[$i].audio = $rel; $n++ }
+  }
+  return $n
+}
+
 $alef = [string][char]0x0627
 $heh = [string][char]0x0647
 $ya = [string][char]0x064A
@@ -846,8 +872,10 @@ Get-ChildItem -LiteralPath $dlgDir -Filter *.md | ForEach-Object {
   $order = if ($kind -eq 'текст') { 1 } elseif ($kind -eq 'чтение') { 2 } elseif ($kind -eq 'ДЗ') { 3 } else { 0 }
   # суффикс id зависит от вида: диалог -> dN, текст -> tN, чтение -> read, ДЗ -> dz (без коллизий)
   $suffix = if ($kind -eq 'текст') { "t$no" } elseif ($kind -eq 'чтение') { 'read' } elseif ($kind -eq 'ДЗ') { 'dz' } else { "d$no" }
+  $matId = "huna$vol-g$chNo-$suffix"
+  $voiced = AttachSentenceAudio $sents $matId $vol   # озвучка материала, если файлы есть
   $dialog = [ordered]@{
-    id = "huna$vol-g$chNo-$suffix"
+    id = $matId
     no = $no
     order = $order
     kind = $(if ($kind) { $kind } else { 'диалог' })
@@ -1056,6 +1084,12 @@ foreach ($s in $stories) {
 }
 Write-Output ("books: huna1 chapters=" + $books['huna1'].chapters.Count + " huna2 chapters=" + $books['huna2'].chapters.Count)
 Write-Output ("stories: " + $stories.Count + "  sentences: " + $totalSents + "  words: " + $totalWords)
+# озвучка материалов «Хуна Арабия» (audio/<папка тома>/<id>-<номер>.mp3)
+$voicedTotal = 0
+foreach ($b in @($books.Values)) { foreach ($c in $b.chapters) { foreach ($d in $c.dialogues) { foreach ($s in $d.sentences) { if ($s.audio) { $voicedTotal++ } } } } }
+$voicedMats = 0
+foreach ($b in @($books.Values)) { foreach ($c in $b.chapters) { foreach ($d in $c.dialogues) { if ($d.sentences.Count -and $d.sentences[0].audio) { $voicedMats++ } } } }
+Write-Output ("озвучено: " + $voicedMats + " материалов, " + $voicedTotal + " предложений")
 Write-Output ("grammar notes: " + $grammar.Count)
 Write-Output ("word coverage: " + [math]::Round(100.0 * ($totalWords - $missWords) / [math]::Max(1, $totalWords), 1) + "%  (missing tokens: " + $missWords + ", unique: " + $missing.Count + ")")
 Write-Output ("sentences with gaps: " + $missSents + " of " + $totalSents)
