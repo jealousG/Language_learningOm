@@ -981,8 +981,12 @@ Get-ChildItem -LiteralPath (Join-Path $VaultDir '04 Грамматика') -Filt
 }
 $grammar = @($grammar | Sort-Object -Property @{ Expression = { [int]$_.tom } }, @{ Expression = { [int]$_.chapter } }, @{ Expression = { $_.title } })
 
-# ------------------------- порядок материалов в главах -------------------------
+# ------------------------- порядок глав и материалов -------------------------
+# Главы — по возрастанию НОМЕРА: файлы на диске сортируются как строки, поэтому
+# «Том 2 - Глава 9.md» попадал в конец (после «Глава 10…16»).
+# Материалы внутри главы: диалоги -> тексты -> чтение, затем по номеру.
 foreach ($bid in @('huna1', 'huna2')) {
+  $books[$bid].chapters = @($books[$bid].chapters | Sort-Object -Property @{ Expression = { [int]$_.no } })
   foreach ($ch in $books[$bid].chapters) {
     $ch.dialogues = @($ch.dialogues | Sort-Object -Property @{ Expression = { [int]$_.order } }, @{ Expression = { [int]$_.no } })
   }
