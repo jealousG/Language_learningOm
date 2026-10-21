@@ -1653,6 +1653,14 @@ function resetPlayerUI() {
     playerAudio.removeAttribute('src');
     playerAudio.load();
   }
+  // Сбрасываем и состояние плейлиста: иначе при открытии текста без аудио
+  // (или озвученного не полностью) оставался плейлист предыдущего текста —
+  // значок реплики играл бы чужой файл.
+  playlist = [];
+  starts = [];
+  totalDuration = 0;
+  currentAyah = 0;
+  wantPlaying = false;
   document.getElementById('seekBar').value = 0;
   document.getElementById('timeCurrent').textContent = '0:00';
   document.getElementById('timeTotal').textContent = '0:00';

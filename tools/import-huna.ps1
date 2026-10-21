@@ -19,27 +19,29 @@ $ErrorActionPreference = 'Stop'
 $utf8bom = New-Object System.Text.UTF8Encoding($true)
 
 # ------------------------- озвучка материалов -------------------------
-# Озвучка лежит в <корень проекта>\audio\<папка тома>\<id материала>-<номер>.mp3,
-# например audio\Huna Arabia 2 том\huna2-g9-d1-3.mp3 (третья реплика диалога 1).
-# Папка тома определяется по цифре в имени (audio\Huna Arabia 2 том -> том 2).
+# Озвучка лежит в <корень проекта>\audio\<папка тома>\...\<id материала>-<номер>.mp3,
+# например audio\Huna Arabia 2 том\huna2-g9-d1-3.mp3 (третья реплика диалога 1)
+# или audio\Huna Arabia 2 том\Озвучка_Глава10\huna2-g10-d1-3.mp3.
+# Ищем РЕКУРСИВНО по папкам томов (папка тома содержит цифру в имени).
 $RepoRoot = Split-Path -Parent $PSScriptRoot
-$AudioDirs = @{}
+$AudioIndex = @{}
 $audioRoot = Join-Path $RepoRoot 'audio'
 if (Test-Path -LiteralPath $audioRoot) {
-  Get-ChildItem -LiteralPath $audioRoot -Directory | ForEach-Object {
-    $m = [regex]::Match($_.Name, '(\d)')
-    if ($m.Success -and -not $AudioDirs.ContainsKey($m.Groups[1].Value)) { $AudioDirs[$m.Groups[1].Value] = $_.Name }
+  Get-ChildItem -LiteralPath $audioRoot -Directory | Where-Object { $_.Name -match '\d' } | ForEach-Object {
+    Get-ChildItem -LiteralPath $_.FullName -Recurse -File -Filter *.mp3 | ForEach-Object {
+      if (-not $AudioIndex.ContainsKey($_.Name)) {
+        $AudioIndex[$_.Name] = 'audio/' + $_.FullName.Substring($audioRoot.Length + 1).Replace('\', '/')
+      }
+    }
   }
 }
 
 # Проставить предложениям относительный путь к озвучке (если файл существует).
-function AttachSentenceAudio($sents, [string]$matId, [int]$vol) {
-  $folder = $AudioDirs["$vol"]
-  if (-not $folder) { return 0 }
+function AttachSentenceAudio($sents, [string]$matId) {
   $n = 0
   for ($i = 0; $i -lt $sents.Count; $i++) {
-    $rel = "audio/$folder/$matId-$($i + 1).mp3"
-    if (Test-Path -LiteralPath (Join-Path $RepoRoot $rel)) { $sents[$i].audio = $rel; $n++ }
+    $key = "$matId-$($i + 1).mp3"
+    if ($AudioIndex.ContainsKey($key)) { $sents[$i].audio = $AudioIndex[$key]; $n++ }
   }
   return $n
 }
@@ -873,7 +875,7 @@ Get-ChildItem -LiteralPath $dlgDir -Filter *.md | ForEach-Object {
   # суффикс id зависит от вида: диалог -> dN, текст -> tN, чтение -> read, ДЗ -> dz (без коллизий)
   $suffix = if ($kind -eq 'текст') { "t$no" } elseif ($kind -eq 'чтение') { 'read' } elseif ($kind -eq 'ДЗ') { 'dz' } else { "d$no" }
   $matId = "huna$vol-g$chNo-$suffix"
-  $voiced = AttachSentenceAudio $sents $matId $vol   # озвучка материала, если файлы есть
+  $voiced = AttachSentenceAudio $sents $matId   # озвучка материала, если файлы есть
   $dialog = [ordered]@{
     id = $matId
     no = $no
@@ -1084,12 +1086,17 @@ foreach ($s in $stories) {
 }
 Write-Output ("books: huna1 chapters=" + $books['huna1'].chapters.Count + " huna2 chapters=" + $books['huna2'].chapters.Count)
 Write-Output ("stories: " + $stories.Count + "  sentences: " + $totalSents + "  words: " + $totalWords)
-# озвучка материалов «Хуна Арабия» (audio/<папка тома>/<id>-<номер>.mp3)
-$voicedTotal = 0
-foreach ($b in @($books.Values)) { foreach ($c in $b.chapters) { foreach ($d in $c.dialogues) { foreach ($s in $d.sentences) { if ($s.audio) { $voicedTotal++ } } } } }
-$voicedMats = 0
-foreach ($b in @($books.Values)) { foreach ($c in $b.chapters) { foreach ($d in $c.dialogues) { if ($d.sentences.Count -and $d.sentences[0].audio) { $voicedMats++ } } } }
+# озвучка материалов «Хуна Арабия» (audio/<папка тома>/.../<id>-<номер>.mp3)
+$voicedMats = 0; $voicedTotal = 0; $voicedPartial = @()
+foreach ($b in @($books.Values)) { foreach ($c in $b.chapters) { foreach ($d in $c.dialogues) {
+  $v = 0; foreach ($s in $d.sentences) { if ($s.audio) { $v++ } }
+  if ($v -gt 0) {
+    $voicedMats++; $voicedTotal += $v
+    if ($v -lt $d.sentences.Count) { $voicedPartial += ("$($d.id) $v/$($d.sentences.Count)") }
+  }
+} } }
 Write-Output ("озвучено: " + $voicedMats + " материалов, " + $voicedTotal + " предложений")
+if ($voicedPartial.Count) { Write-Output ("озвучено ЧАСТИЧНО: " + ($voicedPartial -join ', ')) }
 Write-Output ("grammar notes: " + $grammar.Count)
 Write-Output ("word coverage: " + [math]::Round(100.0 * ($totalWords - $missWords) / [math]::Max(1, $totalWords), 1) + "%  (missing tokens: " + $missWords + ", unique: " + $missing.Count + ")")
 Write-Output ("sentences with gaps: " + $missSents + " of " + $totalSents)
