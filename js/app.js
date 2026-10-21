@@ -1589,6 +1589,10 @@ function initPlayer(story) {
   // скрывался, поэтому после любого текста без аудио (хадисы, намаз, истории)
   // пропадал и в Коране — до перезагрузки страницы.
   const hasAll = story.sentences.every(s => !!(s.ayahAudio || s.audio));
+  // «Чтец» относится только к аятам Корана: в озвучке материалов выбор чтеца не нужен
+  const isQuran = story.sentences.some(s => !!s.ayahAudio);
+  const reciterCtrl = document.querySelector('.reciter-control');
+  if (reciterCtrl) reciterCtrl.classList.toggle('hidden', !isQuran);
   const bar = document.querySelector('.player-bar');
   if (!hasAll || !story.sentences.length) {
     if (bar) bar.classList.add('hidden');
@@ -2053,7 +2057,7 @@ const EX_TYPE_LABELS = {
 // Параметры единой тренировки слов
 const LEARN_STREAK = 5;        // столько верных ответов подряд — слово «выучено» (режим «Ислам»)
 const LEARN_STREAK_ARABIC = 3; // в «Арабском языке» порог мягче: лексику не заучиваем наизусть
-const STUDY_SESSION_MAX = 20;  // максимум вопросов в одной сессии
+const STUDY_SESSION_MAX = 50;  // максимум вопросов в одной сессии
 const STUDY_BUILD_EVERY = 5;   // каждые N слов — задание «собери аят» (только «Ислам»)
 const STUDY_ADVANCE_SEC = 10;     // «Ислам»: сколько секунд на разбор после ответа, затем авто-переход
 const STUDY_ADVANCE_SEC_AR = 3;   // «Арабский язык»: лексика, разбор не нужен — короче
@@ -2110,8 +2114,6 @@ function grammarQuestion(word) {
   const pos = (word.pos || '').toLowerCase();
   if (!pos) return null;
   const isVerb = pos.startsWith('глагол') || pos.startsWith('гл.') || pos.startsWith('глагол-связка');
-  const isNoun = pos.startsWith('существительное') || pos.startsWith('сущ.');
-  const isParticle = pos.startsWith('предлог') || pos.startsWith('частица') || pos.startsWith('союз');
   if (isVerb) {
     if (pos.includes('повелит')) {
       return { q: 'Какая это форма глагола?', options: ['Повелительное наклонение', 'Прошедшее время'], correct: 'Повелительное наклонение' };
@@ -2125,14 +2127,12 @@ function grammarQuestion(word) {
     if (pos.includes('страдательн')) {
       return { q: 'Какой залог у этого глагола?', options: ['Активный', 'Страдательный'], correct: 'Страдательный' };
     }
-    return { q: 'Это глагольная форма или имя (существительное)?', options: ['Глагольная форма', 'Имя (существительное)'], correct: 'Глагольная форма' };
+    // без конкретного признака (время/наклонение/залог) вопроса нет
+    return null;
   }
-  if (isNoun) {
-    return { q: 'Это глагольная форма или имя (существительное)?', options: ['Глагольная форма', 'Имя (существительное)'], correct: 'Имя (существительное)' };
-  }
-  if (isParticle) {
-    return { q: 'Это служебное слово или самостоятельное?', options: ['Служебное (частица, предлог, союз)', 'Самостоятельное слово'], correct: 'Служебное (частица, предлог, союз)' };
-  }
+  // Имена и служебные слова (существительные, частицы, предлоги, союзы) грамматического
+  // вопроса не получают по решению пользователя: убраны вопросы «это глагольная форма или
+  // имя (существительное)?» и «это служебное слово или самостоятельное?».
   return null;
 }
 
@@ -2457,6 +2457,12 @@ function renderExercise(q) {
     }
     case 't6': {
       const g = grammarQuestion(w);
+      if (!g) { // грамматического вопроса нет (например, служебное слово) — обычный «слово → перевод»
+        correct = w.ru;
+        options = shuffle([correct, ...pickDistractors(correct, study.story, 'ru')]);
+        prompt = `<div class="study-question-ar" lang="ar" dir="rtl">${escapeHtml(wordDisplay(w.w))}</div>`;
+        break;
+      }
       correct = g.correct;
       options = g.options;
       prompt = `<div class="study-question-ar" lang="ar" dir="rtl">${escapeHtml(wordDisplay(w.w))}</div>
