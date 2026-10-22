@@ -608,6 +608,28 @@
     record(!gameRootBetter({ score: 8, seconds: 30 }, { score: 5, seconds: 10 }, 'quiz'), 'Корень: меньше очков — не рекорд');
     record(gameRootBetter({ score: 8, seconds: 40 }, { score: 8, seconds: 25 }, 'quiz'), 'Корень: при равных очках — быстрее лучше');
     record(gameRootBetter({ mistakes: 1, seconds: 40 }, { mistakes: 3, seconds: 25 }, 'family'), 'Корень: семейство — по времени');
+
+    // ------------------- «Клоуз» -------------------
+    const clozSent1 = { words: [{ w: 'هَذَا' }, { w: 'كِتَابٌ' }], ru: 'это книга' };
+    const clozSent2 = { words: [{ w: 'الْبَيْتُ' }], ru: 'дом' };
+    const clozSent3 = { words: [{ w: 'قَلَمٌ' }], ru: 'ручка' };
+    const clozItems = [
+      { word: { w: 'كِتَاب', ru: 'книга' }, sentence: clozSent1, gapIndex: 1 },
+      { word: { w: 'هَذَا', ru: 'это' }, sentence: clozSent1, gapIndex: 0 },
+      { word: { w: 'بَيْت', ru: 'дом' }, sentence: clozSent2, gapIndex: 0 },
+      { word: { w: 'قَلَم', ru: 'ручка' }, sentence: clozSent3, gapIndex: 0 }
+    ];
+    const clozOpts = gameClozeOptions('كتاب', clozItems, 4);
+    eq('Клоуз: четыре варианта', clozOpts.length, 4);
+    record(clozOpts.indexOf('كتاب') >= 0, 'Клоуз: правильное слово среди вариантов');
+    eq('Клоуз: варианты без повторов', new Set(clozOpts).size, 4);
+
+    const clozQs = gameClozeQuestions(clozItems, 10);
+    eq('Клоуз: одно предложение — один вопрос', clozQs.length, 3);
+    record(clozQs.every(q => q.options.indexOf(q.correct) >= 0), 'Клоуз: правильный ответ есть в вариантах');
+    record(clozQs.every(q => q.sentence && q.gapIndex >= 0 && q.gapIndex < q.sentence.words.length),
+      'Клоуз: пропуск указывает на слово в предложении');
+    record(clozQs.every(q => !!q.ru), 'Клоуз: у пропущенного слова есть перевод');
   }
 
   // Запуск: сначала синхронные тесты ядра, затем асинхронные тесты хранилища

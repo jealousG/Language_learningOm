@@ -200,12 +200,6 @@
           <label class="game-opt">Источник
             <select id="memSource"></select>
           </label>
-          <label class="game-opt">Пары
-            <select id="memMode">
-              <option value="pair">слово ↔ перевод</option>
-              <option value="gap">пропуск в предложении ↔ слово</option>
-            </select>
-          </label>
           <label class="game-opt">Размер
             <select id="memSize">
               <option value="6" selected>6 пар</option>
@@ -241,6 +235,25 @@
         <div class="game-foot">
           <span class="game-record" id="rootRecord">Рекорда пока нет</span>
           <button type="button" class="ctrl-btn primary" id="rootStart">Играть</button>
+        </div>
+      </div>
+
+      <div class="game-card">
+        <div class="game-card-head">
+          <span class="game-ico" aria-hidden="true">▢</span>
+          <div>
+            <h3 class="game-title">Клоуз</h3>
+            <div class="game-sub">Пропуск в реальном предложении: выберите слово, которое там было (10 предложений)</div>
+          </div>
+        </div>
+        <div class="game-opts">
+          <label class="game-opt">Источник
+            <select id="clozeSource"></select>
+          </label>
+        </div>
+        <div class="game-foot">
+          <span class="game-record" id="clozeRecord">Рекорда пока нет</span>
+          <button type="button" class="ctrl-btn primary" id="clozeStart">Играть</button>
         </div>
       </div>
     </div>
@@ -297,6 +310,28 @@
       </div>
 
       <div id="rootResult" class="mem-result hidden"></div>
+    </div>
+
+    <div id="clozeGame" class="memory-game hidden">
+      <div class="mem-head">
+        <div class="mem-hud">
+          <span id="clozeTimer">0:00</span><span class="mem-dot">·</span><span id="clozeScore">0 из 10</span><span class="mem-dot">·</span><span id="clozeProgress">1/10</span>
+        </div>
+        <div class="mem-head-right">
+          <span class="mem-best hidden" id="clozeBest"></span>
+          <button type="button" class="ctrl-btn small" id="clozeQuit">Выйти</button>
+        </div>
+      </div>
+
+      <div class="cloze-quiz">
+        <div class="cloze-sentence" id="clozeSentence" dir="rtl"></div>
+        <div class="cloze-ru" id="clozeRu"></div>
+        <div class="cloze-options" id="clozeOptions"></div>
+        <div class="cloze-after hidden" id="clozeAfter"></div>
+        <div class="root-msg" id="clozeMsg"></div>
+      </div>
+
+      <div id="clozeResult" class="mem-result hidden"></div>
     </div>
   </main>
 

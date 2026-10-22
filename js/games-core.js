@@ -207,3 +207,52 @@ function gameRootBetter(prev, next, mode) {
   }
   return (+next.seconds || 0) < (+prev.seconds || 0);
 }
+
+// ------------------------- «Клоуз» -------------------------
+
+/** Варианты ответа для «клоуза»: правильное слово + чужие формы (по умолчанию 4). */
+function gameClozeOptions(correct, items, count, rng) {
+  const wanted = Math.max(2, count || 4);
+  const seen = new Set([correct]);
+  const pool = [];
+  (items || []).forEach(it => {
+    const w = it && it.word;
+    if (!w || !w.w) return;
+    const disp = (typeof wordDisplay === 'function') ? wordDisplay(w.w) : w.w;
+    if (!disp || seen.has(disp)) return;
+    seen.add(disp);
+    pool.push(disp);
+  });
+  return gameShuffle([correct].concat(gameShuffle(pool, rng).slice(0, wanted - 1)), rng);
+}
+
+/**
+ * Вопросы «клоуз»: до count предложений, в каждом — пропуск одного слова.
+ * Одно предложение — один вопрос. Возвращает
+ * [{sentence, gapIndex, word, ru, correct, options}].
+ */
+function gameClozeQuestions(items, count, rng) {
+  const bySent = new Map();
+  (items || []).forEach(it => {
+    if (!it || !it.sentence) return;
+    if (!bySent.has(it.sentence)) bySent.set(it.sentence, []);
+    bySent.get(it.sentence).push(it);
+  });
+  const sents = gameShuffle([...bySent.keys()], rng).slice(0, count || 10);
+  const out = [];
+  sents.forEach(sent => {
+    const cands = (bySent.get(sent) || []).filter(it => it.word && String(it.word.ru || '').trim());
+    if (!cands.length) return;
+    const pick = gameShuffle(cands, rng)[0];
+    const correct = (typeof wordDisplay === 'function') ? wordDisplay(pick.word.w) : pick.word.w;
+    out.push({
+      sentence: sent,
+      gapIndex: pick.gapIndex,
+      word: pick.word,
+      ru: pick.word.ru,
+      correct: correct,
+      options: gameClozeOptions(correct, items, 4, rng)
+    });
+  });
+  return out;
+}

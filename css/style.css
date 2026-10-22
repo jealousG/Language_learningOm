@@ -1905,3 +1905,40 @@ summary:focus-visible, [tabindex]:focus-visible {
   .root-family-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .rft-ar { font-size: 19px; }
 }
+/* ------------------------- Игра «Клоуз» ------------------------- */
+.cloze-quiz { max-width: 760px; }
+.cloze-sentence {
+  font-family: var(--ar-font); font-size: 26px; line-height: 1.9;
+  text-align: center; margin: 16px 0 10px; color: var(--ink);
+}
+.cloze-gap {
+  display: inline-block; min-width: 74px;
+  border-bottom: 2px dashed var(--emerald); color: var(--emerald);
+  font-weight: 600;
+}
+.cloze-word { white-space: nowrap; }
+.cloze-ru { text-align: center; font-size: 14px; opacity: .6; margin-bottom: 18px; line-height: 1.5; }
+.cloze-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.cloze-option {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 14px; border-radius: 12px;
+  border: 1px solid var(--line); background: var(--card);
+  color: var(--ink); cursor: pointer; font-size: 15px;
+  transition: background .14s ease, border-color .14s ease;
+}
+.cloze-option:hover { background: var(--paper-deep); }
+.cloze-option-num { font-size: 11px; opacity: .5; min-width: 14px; font-family: var(--font-ui); }
+.cloze-option-ar { font-family: var(--ar-font); font-size: 22px; }
+.cloze-option.right { border-color: var(--emerald); background: #eaf3ef; }
+.cloze-option.wrong { border-color: #c0504d; background: #fbf0ef; }
+.cloze-option.done { cursor: default; }
+.cloze-after {
+  margin-top: 16px; text-align: center; font-size: 14px;
+  padding: 10px 12px; border-radius: 10px; background: var(--paper-deep);
+}
+.cloze-after b { font-family: var(--ar-font); font-size: 22px; font-weight: 400; }
+
+@media (max-width: 620px) {
+  .cloze-sentence { font-size: 21px; }
+  .cloze-options { grid-template-columns: 1fr; }
+}

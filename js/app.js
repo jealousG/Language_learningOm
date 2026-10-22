@@ -2934,6 +2934,14 @@ document.addEventListener('DOMContentLoaded', () => {
     if (el) el.addEventListener('change', () => { if (typeof renderRootRecord === 'function') renderRootRecord(); });
   });
 
+  // Игры («Клоуз»)
+  const clozeStartBtn = document.getElementById('clozeStart');
+  if (clozeStartBtn) clozeStartBtn.addEventListener('click', () => { if (typeof clozeStartGame === 'function') clozeStartGame(); });
+  const clozeQuitBtn = document.getElementById('clozeQuit');
+  if (clozeQuitBtn) clozeQuitBtn.addEventListener('click', () => { if (typeof clozeBackToHub === 'function') clozeBackToHub(); });
+  const clozeSourceEl = document.getElementById('clozeSource');
+  if (clozeSourceEl) clozeSourceEl.addEventListener('change', () => { if (typeof renderClozeRecord === 'function') renderClozeRecord(); });
+
   // Режимы огласовок (только визуальная копия, данные не меняются)
   document.querySelectorAll('#harakatControls button[data-h]').forEach(btn => {
     btn.addEventListener('click', () => setHarakatMode(btn.dataset.h));

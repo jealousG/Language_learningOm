@@ -126,6 +126,7 @@ function renderGames() {
   if (selSize && opts.size) selSize.value = String(opts.size);
   renderMemoryRecord();
   if (typeof renderRootCard === 'function') renderRootCard();
+  if (typeof renderClozeCard === 'function') renderClozeCard();
 }
 
 /** Рекорд для сочетания «источник + режим + размер» (или общий — из старого формата). */
@@ -471,6 +472,7 @@ function gamesStop() {
   memTimerId = null;
   MEM = null;
   if (typeof rootStop === 'function') rootStop();
+  if (typeof clozeStop === 'function') clozeStop();
   const game = document.getElementById('memoryGame');
   if (game) game.classList.add('hidden');
   const hub = document.getElementById('gamesHub');
@@ -813,5 +815,255 @@ function rootStop() {
   rootTimerId = null;
   ROOT = null;
   const game = document.getElementById('rootGame');
+  if (game) game.classList.add('hidden');
+}
+// ========================= «Клоуз» =========================
+
+let CLOZE = null;
+let clozTimerId = null;
+const CLOZE_COUNT = 10;   // предложений в партии
+
+function clozeBestRecord(sourceId) {
+  const map = gameRecords().cloze || {};
+  return map[sourceId] || null;
+}
+
+function renderClozeCard() {
+  const sel = document.getElementById('clozeSource');
+  if (sel && !sel.options.length) {
+    const groups = new Map();
+    gamesSources().forEach(s => {
+      if (!groups.has(s.group)) groups.set(s.group, []);
+      groups.get(s.group).push(s);
+    });
+    groups.forEach((list, gname) => {
+      const grp = document.createElement('optgroup');
+      grp.label = gname;
+      list.forEach(s => {
+        const o = document.createElement('option');
+        o.value = s.id;
+        o.textContent = s.label;
+        grp.appendChild(o);
+      });
+      sel.appendChild(grp);
+    });
+  }
+  const opts = gameRecords().opts || {};
+  if (sel && opts.clozeSource) sel.value = opts.clozeSource;
+  renderClozeRecord();
+}
+
+function renderClozeRecord() {
+  const el = document.getElementById('clozeRecord');
+  if (!el) return;
+  const sourceId = (document.getElementById('clozeSource') || {}).value || '';
+  const best = clozeBestRecord(sourceId);
+  el.textContent = best
+    ? 'Лучшее: ' + best.score + ' из ' + best.total + ' · ' + fmtTime(best.seconds)
+    : 'Рекорда пока нет';
+}
+
+function clozeMsg(text, isError) {
+  const el = document.getElementById('clozeMsg');
+  if (!el) return;
+  el.textContent = text || '';
+  el.classList.toggle('error', !!isError);
+}
+
+function clozeHud() {
+  if (!CLOZE) return;
+  const t = document.getElementById('clozeTimer');
+  if (t) t.textContent = fmtTime(CLOZE.elapsed || ((Date.now() - CLOZE.startedAt) / 1000));
+  const s = document.getElementById('clozeScore');
+  if (s) s.textContent = CLOZE.score + ' из ' + CLOZE.total;
+  const p = document.getElementById('clozeProgress');
+  if (p) p.textContent = Math.min(CLOZE.idx + 1, CLOZE.total) + '/' + CLOZE.total;
+}
+
+function clozeBestLine() {
+  const el = document.getElementById('clozeBest');
+  if (!el) return;
+  const best = clozeBestRecord(CLOZE ? CLOZE.sourceId : '');
+  if (!best) { el.textContent = ''; el.classList.add('hidden'); return; }
+  el.textContent = 'Лучшее: ' + best.score + ' из ' + best.total;
+  el.classList.remove('hidden');
+}
+
+/** Предложение с пропуском (gapIndex = -1 — показать целиком). */
+function clozeSentenceHtml(sentence, gapIndex) {
+  const words = (sentence && sentence.words) || [];
+  return words.map((w, i) => {
+    if (i === gapIndex) return '<span class="cloze-gap">____</span>';
+    return '<span class="cloze-word">' + escapeHtml((w && w.w) || '') + '</span>';
+  }).join(' ');
+}
+
+function clozeStartGame() {
+  const sourceId = (document.getElementById('clozeSource') || {}).value || '';
+  const items = gamesItems(sourceId);
+  const questions = gameClozeQuestions(items, CLOZE_COUNT);
+  if (questions.length < 3) {
+    const el = document.getElementById('clozeRecord');
+    if (el) el.textContent = 'В этом источнике слишком мало предложений.';
+    return;
+  }
+  const rec = gameRecords();
+  rec.opts = Object.assign({}, rec.opts || {}, { clozeSource: sourceId });
+  saveGameRecords(rec);
+
+  CLOZE = {
+    sourceId: sourceId,
+    items: items,
+    questions: questions,
+    idx: 0,
+    score: 0,
+    mistakes: 0,
+    total: questions.length,
+    ink: 0,
+    section: gamesInkSection(sourceId),
+    startedAt: Date.now(),
+    elapsed: 0,
+    locked: false
+  };
+
+  document.getElementById('gamesHub').classList.add('hidden');
+  document.getElementById('clozeGame').classList.remove('hidden');
+  document.getElementById('clozeResult').classList.add('hidden');
+  closBestHide();
+  clozeHud();
+  clearInterval(clozTimerId);
+  clozTimerId = setInterval(() => {
+    if (!CLOZE) return;
+    CLOZE.elapsed = (Date.now() - CLOZE.startedAt) / 1000;
+    clozeHud();
+  }, 250);
+  clozeBestLine();
+  clozeRender();
+}
+
+function closBestHide() {
+  const el = document.getElementById('clozeResult');
+  if (el) el.classList.add('hidden');
+}
+
+function clozeRender() {
+  if (!CLOZE) return;
+  const q = CLOZE.questions[CLOZE.idx];
+  if (!q) { clozeFinish(); return; }
+  CLOZE.locked = false;
+  const sentEl = document.getElementById('clozeSentence');
+  if (sentEl) sentEl.innerHTML = clozeSentenceHtml(q.sentence, q.gapIndex);
+  const ruEl = document.getElementById('clozeRu');
+  if (ruEl) ruEl.textContent = q.sentence.ru || '';
+  const after = document.getElementById('clozeAfter');
+  if (after) { after.className = 'cloze-after hidden'; after.innerHTML = ''; }
+  const box = document.getElementById('clozeOptions');
+  box.innerHTML = '';
+  q.options.forEach((opt, i) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'cloze-option';
+    b.dataset.opt = opt;
+    b.innerHTML = '<span class="cloze-option-num">' + (i + 1) + '</span>' +
+      '<span class="cloze-option-ar" dir="rtl">' + escapeHtml(opt) + '</span>';
+    b.addEventListener('click', () => clozeAnswer(opt, b));
+    box.appendChild(b);
+  });
+  clozeMsg('');
+  clozeHud();
+}
+
+function clozeAnswer(opt, btn) {
+  if (!CLOZE || CLOZE.locked) return;
+  CLOZE.locked = true;
+  const q = CLOZE.questions[CLOZE.idx];
+  const ok = opt === q.correct;
+  document.querySelectorAll('#clozeOptions .cloze-option').forEach(b => {
+    b.classList.add('done');
+    if (b.dataset.opt === q.correct) b.classList.add('right');
+  });
+  if (ok) {
+    btn.classList.add('right');
+    CLOZE.score++;
+    CLOZE.ink += 2;
+    if (typeof INK !== 'undefined') INK.add(2, CLOZE.section);
+    if (typeof logActivity === 'function') logActivity({ reviews: 1, correct: 1, words: 1 });
+    clozeMsg('Верно');
+  } else {
+    btn.classList.add('wrong');
+    CLOZE.mistakes++;
+    clozeMsg('Правильно: ' + q.correct + (q.ru ? ' — ' + q.ru : ''), true);
+  }
+  const sentEl = document.getElementById('clozeSentence');
+  if (sentEl) sentEl.innerHTML = clozeSentenceHtml(q.sentence, -1);
+  const after = document.getElementById('clozeAfter');
+  if (after) {
+    after.className = 'cloze-after';
+    after.innerHTML = '<b dir="rtl">' + escapeHtml(q.correct) + '</b> — ' + escapeHtml(q.ru || '');
+  }
+  clozeHud();
+  setTimeout(() => { if (CLOZE) { CLOZE.idx++; clozeRender(); } }, ok ? 900 : 2400);
+}
+
+function clozeFinish() {
+  if (!CLOZE) return;
+  CLOZE.elapsed = (Date.now() - CLOZE.startedAt) / 1000;
+  clearInterval(clozTimerId);
+  clozTimerId = null;
+
+  const rec = gameRecords();
+  rec.cloze = rec.cloze || {};
+  const key = CLOZE.sourceId;
+  const prev = rec.cloze[key] || null;
+  const result = {
+    score: CLOZE.score,
+    total: CLOZE.total,
+    mistakes: CLOZE.mistakes,
+    seconds: Math.round(CLOZE.elapsed),
+    at: Date.now()
+  };
+  const isRecord = gameRootBetter(prev, result, 'quiz');
+  if (isRecord) rec.cloze[key] = result;
+  saveGameRecords(rec);
+  if (typeof logActivity === 'function') logActivity({ trainings: 1 });
+
+  const state = CLOZE;
+  CLOZE = null;
+  const el = document.getElementById('clozeResult');
+  el.classList.remove('hidden');
+  el.innerHTML =
+    '<div class="study-summary">' +
+      '<div class="mem-result-title">' + (isRecord ? 'Новый рекорд!' : 'Партия завершена') + '</div>' +
+      '<div class="mem-result-stats">' +
+        '<span>' + fmtTime(state.elapsed) + '</span>' +
+        '<span>' + state.score + ' из ' + state.total + '</span>' +
+        '<span>ошибок: ' + state.mistakes + '</span>' +
+      '</div>' +
+      '<div class="mem-result-ink">+' + state.ink + ' чернил</div>' +
+      (prev ? '<div class="mem-result-prev">Прошлое лучшее: ' + prev.score + ' из ' + prev.total + '</div>' : '') +
+      '<div class="study-actions" style="justify-content:center">' +
+        '<button class="ctrl-btn primary" id="clozeAgainBtn">Играть ещё</button>' +
+        '<button class="ctrl-btn" id="clozeHubBtn">Другая игра</button>' +
+      '</div>' +
+    '</div>';
+  document.getElementById('clozeAgainBtn').addEventListener('click', clozeStartGame);
+  document.getElementById('clozeHubBtn').addEventListener('click', clozeBackToHub);
+  renderClozeRecord();
+}
+
+function clozeBackToHub() {
+  clearInterval(clozTimerId);
+  clozTimerId = null;
+  CLOZE = null;
+  document.getElementById('clozeGame').classList.add('hidden');
+  document.getElementById('gamesHub').classList.remove('hidden');
+  renderGames();
+}
+
+function clozeStop() {
+  clearInterval(clozTimerId);
+  clozTimerId = null;
+  CLOZE = null;
+  const game = document.getElementById('clozeGame');
   if (game) game.classList.add('hidden');
 }
