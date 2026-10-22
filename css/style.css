@@ -1748,3 +1748,104 @@ summary:focus-visible, [tabindex]:focus-visible {
   .words-ru { grid-column: 1 / -1; grid-row: 2; }
 }
 
+
+/* ------------------------- Игры: «Мемори+» ------------------------- */
+.games-hub { display: grid; gap: 16px; max-width: 820px; }
+
+.game-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 18px 20px;
+}
+.game-card-head { display: flex; gap: 14px; align-items: flex-start; }
+.game-ico { font-size: 25px; line-height: 1.1; }
+.game-title { font-family: var(--font-serif); font-size: 19px; margin: 0 0 4px; color: var(--ink); }
+.game-sub { font-size: 13.5px; opacity: .72; line-height: 1.45; }
+
+.game-opts { display: flex; flex-wrap: wrap; gap: 14px; margin: 16px 0 14px; }
+.game-opt { display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; opacity: .8; }
+.game-opt select {
+  font-family: var(--font-ui); font-size: 13.5px; padding: 7px 10px;
+  border: 1px solid var(--line); border-radius: 9px;
+  background: var(--paper); color: var(--ink); min-width: 200px;
+}
+.game-foot { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+.game-record { font-size: 13px; opacity: .7; }
+.game-card-soon { opacity: .55; }
+
+.memory-game { max-width: 820px; }
+.mem-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 14px; }
+.mem-hud { font-family: var(--font-ui); font-size: 14px; }
+.mem-dot { opacity: .3; margin: 0 7px; }
+
+.mem-board {
+  display: grid;
+  grid-template-columns: repeat(var(--mem-cols, 4), minmax(0, 1fr));
+  gap: 10px;
+}
+.mem-card {
+  position: relative; aspect-ratio: 1 / 1;
+  border: 1px solid var(--line); border-radius: 12px;
+  background: var(--paper-deep); cursor: pointer; padding: 6px;
+  display: flex; align-items: center; justify-content: center;
+  transition: transform .14s ease, box-shadow .14s ease, background .14s ease, border-color .14s ease;
+}
+.mem-card:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,.07); }
+.mem-face { display: flex; align-items: center; justify-content: center; text-align: center; width: 100%; height: 100%; }
+.mem-back { font-size: 20px; opacity: .28; }
+.mem-front { display: none; }
+.mem-card.open .mem-back, .mem-card.matched .mem-back { display: none; }
+.mem-card.open .mem-front, .mem-card.matched .mem-front { display: flex; }
+.mem-card.open { background: var(--card); border-color: var(--emerald); }
+.mem-card.matched { background: #eaf3ef; border-color: var(--emerald); cursor: default; }
+.mem-card.wrong { background: #fbf0ef; border-color: #c0504d; }
+.mem-card .mem-front {
+  font-family: var(--font-ui); font-size: 15px; line-height: 1.3;
+  color: var(--ink); padding: 2px; overflow-wrap: anywhere;
+}
+.mem-card .mem-front[dir="rtl"] { font-family: var(--ar-font); font-size: 21px; line-height: 1.5; }
+
+.mem-recall {
+  margin-top: 20px; background: var(--card);
+  border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px;
+}
+.recall-progress { font-size: 12.5px; opacity: .6; margin-bottom: 8px; }
+.recall-ru { font-family: var(--font-serif); font-size: 19px; margin-bottom: 10px; }
+.recall-slot {
+  min-height: 56px; display: flex; align-items: center; justify-content: center;
+  font-family: var(--ar-font); font-size: 30px;
+  border-bottom: 2px dashed var(--line); margin-bottom: 14px;
+}
+.recall-slot.shake { animation: recallShake .4s ease; }
+@keyframes recallShake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-6px); }
+  75% { transform: translateX(6px); }
+}
+.recall-letters { display: flex; flex-wrap: wrap; gap: 8px; direction: rtl; }
+.recall-tile {
+  font-family: var(--ar-font); font-size: 23px;
+  min-width: 46px; height: 46px; border-radius: 10px;
+  border: 1px solid var(--line); background: var(--paper);
+  color: var(--ink); cursor: pointer;
+}
+.recall-tile:hover { background: var(--paper-deep); }
+.recall-tile.used { opacity: .22; cursor: default; }
+.recall-actions { margin-top: 12px; }
+.recall-msg { min-height: 20px; font-size: 13.5px; margin-top: 6px; color: var(--emerald); }
+.recall-msg.error { color: #b04a47; }
+
+.mem-result { margin-top: 20px; }
+.mem-result-title { font-family: var(--font-serif); font-size: 21px; margin-bottom: 10px; }
+.mem-result-stats { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.mem-result-stats span { font-size: 13px; padding: 4px 10px; border-radius: 8px; background: var(--paper-deep); }
+.mem-result-ink { color: var(--gold); font-size: 14px; margin-bottom: 14px; }
+
+@media (max-width: 620px) {
+  .mem-board { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .game-opts { gap: 10px; }
+  .game-opt select { min-width: 150px; }
+  .mem-card .mem-front { font-size: 13px; }
+  .mem-card .mem-front[dir="rtl"] { font-size: 18px; }
+}

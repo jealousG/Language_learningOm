@@ -509,6 +509,57 @@
     record(INK.modeInk('islam') >= INK.inkOf('quran'), 'INK: чернила Основы ≥ чернил одного раздела', INK.modeInk('islam'));
   }
 
+  // ------------------- Игры («Мемори+»): ядро -------------------
+  function gamesTests() {
+    if (typeof gamePairPool !== 'function') {
+      record(false, 'Игры: ядро games-core.js загружено');
+      return;
+    }
+    record(true, 'Игры: ядро games-core.js загружено');
+
+    const pool = gamePairPool([
+      { word: { w: 'كتاب', ru: 'книга' }, sentence: null, gapIndex: 0 },
+      { word: { w: 'قلم', ru: 'книга' }, sentence: null, gapIndex: 0 },
+      { word: { w: 'الله', ru: 'Аллах', pos: 'имя собств.' }, sentence: null },
+      { word: { w: '19', ru: '19', pos: 'числ.' }, sentence: null },
+      { word: { w: 'بيت', ru: '' }, sentence: null },
+      { word: { w: 'باب', ru: 'дверь' }, sentence: null, gapIndex: 0 }
+    ]);
+    eq('Игры: пул пар — только слова с переводом и без дублей перевода', pool.length, 2);
+    eq('Игры: пул пар — имена и цифры отброшены', pool.map(p => p.word.w).join(','), 'كتاب,باب');
+
+    const pairs = [
+      { word: { w: 'كتاب' }, ru: 'книга' },
+      { word: { w: 'باب' }, ru: 'дверь' }
+    ];
+    const board = gameBuildBoard(pairs, 2, 'pair', () => 0.5);
+    eq('Игры: доска — по две карточки на пару', board.length, 4);
+    eq('Игры: доска — ровно две пары', [...new Set(board.map(c => c.pairId))].length, 2);
+    record(board.filter(c => c.kind === 'ar').length === 2 && board.filter(c => c.kind === 'ru').length === 2,
+      'Игры: доска — 2 арабские и 2 переводные карточки');
+
+    const sent = { words: [{ w: 'أنا' }, { w: 'طالب' }, { w: 'جديد' }], ru: 'я новый студент' };
+    eq('Игры: пропуск вместо слова', gameGapSentence(sent, 1), 'أنا _____ جديد');
+    eq('Игры: пропуск без индекса — перевод', gameGapSentence(sent, -1), 'я новый студент');
+
+    eq('Игры: буквы слова без огласовок', gameWordLetters('كِتَابٌ').join(''), 'كتاب');
+    eq('Игры: буквы без пунктуации', gameWordLetters('الْكَهْفِ،').join(''), 'الكهف');
+
+    const letters = gameScramble('كتاب', () => 0.5);
+    eq('Игры: перемешанные буквы — тот же набор', letters.slice().sort().join(''), gameWordLetters('كتاب').sort().join(''));
+
+    record(gameAssemblyCorrect(['ك', 'ت', 'ا', 'ب'], 'كِتَابٌ'), 'Игры: сборка — верное слово с огласовками');
+    record(!gameAssemblyCorrect(['ك', 'ا', 'ت', 'ب'], 'كتاب'), 'Игры: сборка — неверный порядок');
+
+    const recall = gameRecallWords([{ word: { w: 'أ' } }, { word: { w: 'ب' } }, { word: { w: 'ج' } }], { 'ب': 3, 'ج': 1 }, 2);
+    eq('Игры: закрепление — сначала слова с ошибками', recall.map(r => r.word.w).join(''), 'بج');
+    eq('Игры: закрепление — не больше запрошенного', gameRecallWords([{ word: { w: 'أ' } }], {}, 3).length, 1);
+
+    record(gameRecordBetter(null, { seconds: 10, moves: 5 }), 'Игры: рекорд — первый результат всегда рекорд');
+    record(gameRecordBetter({ seconds: 20, moves: 9 }, { seconds: 10, moves: 12 }), 'Игры: рекорд — по времени');
+    record(!gameRecordBetter({ seconds: 10, moves: 8 }, { seconds: 10, moves: 9 }), 'Игры: рекорд — при равном времени по ходам');
+  }
+
   // Запуск: сначала синхронные тесты ядра, затем асинхронные тесты хранилища
   try {
     coreTests();
@@ -524,6 +575,11 @@
     inkTests();
   } catch (e) {
     record(false, 'Тесты золотых чернил выполнились без исключений', e.message);
+  }
+  try {
+    gamesTests();
+  } catch (e) {
+    record(false, 'Тесты игр выполнились без исключений', e.message);
   }
   storageTests();
 })();

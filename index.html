@@ -33,6 +33,7 @@
       <button class="nav-tab hidden" data-section="huna1">Хуна Арабия 1 Том</button>
       <button class="nav-tab hidden" data-section="huna2">Хуна Арабия 2 Том</button>
       <button class="nav-tab hidden" data-section="words">Слова</button>
+      <button class="nav-tab hidden" data-section="games">Игры</button>
       <button class="nav-tab hidden" data-section="grammar">Грамматика</button>
     </div>
   </nav>
@@ -182,6 +183,78 @@
     <div id="wordsBody" class="words-body"></div>
   </main>
 
+  <!-- ЭКРАН 1е-6: Игры (Мемори+) -->
+  <main id="screen-games" class="screen hidden">
+    <h2 class="section-title">Игры</h2>
+
+    <div id="gamesHub" class="games-hub">
+      <div class="game-card">
+        <div class="game-card-head">
+          <span class="game-ico" aria-hidden="true">🃏</span>
+          <div>
+            <h3 class="game-title">Мемори+</h3>
+            <div class="game-sub">Найдите пары «слово ↔ перевод», затем соберите слова по переводу</div>
+          </div>
+        </div>
+        <div class="game-opts">
+          <label class="game-opt">Источник
+            <select id="memSource"></select>
+          </label>
+          <label class="game-opt">Пары
+            <select id="memMode">
+              <option value="pair">слово ↔ перевод</option>
+              <option value="gap">пропуск в предложении ↔ слово</option>
+            </select>
+          </label>
+          <label class="game-opt">Размер
+            <select id="memSize">
+              <option value="6" selected>6 пар</option>
+              <option value="8">8 пар</option>
+            </select>
+          </label>
+        </div>
+        <div class="game-foot">
+          <span class="game-record" id="memRecord">Рекорда пока нет</span>
+          <button type="button" class="ctrl-btn primary" id="memStart">Играть</button>
+        </div>
+      </div>
+
+      <div class="game-card game-card-soon">
+        <div class="game-card-head">
+          <span class="game-ico" aria-hidden="true">🌱</span>
+          <div>
+            <h3 class="game-title">Корень</h3>
+            <div class="game-sub">Скоро: семейства корней и «угадай значение по корню»</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="memoryGame" class="memory-game hidden">
+      <div class="mem-head">
+        <div class="mem-hud">
+          <span id="memTimer">0:00</span><span class="mem-dot">·</span><span id="memMoves">0 ходов</span><span class="mem-dot">·</span><span id="memPairs">0/6</span>
+        </div>
+        <button type="button" class="ctrl-btn small" id="memQuit">Выйти</button>
+      </div>
+
+      <div class="mem-board" id="memBoard"></div>
+
+      <div id="memRecall" class="mem-recall hidden">
+        <div class="recall-progress" id="recallProgress"></div>
+        <div class="recall-ru" id="recallRu"></div>
+        <div class="recall-slot" id="recallSlot"></div>
+        <div class="recall-letters" id="recallLetters"></div>
+        <div class="recall-actions">
+          <button type="button" class="ctrl-btn small" id="recallClear">Сброс</button>
+        </div>
+        <div class="recall-msg" id="recallMsg"></div>
+      </div>
+
+      <div id="memResult" class="mem-result hidden"></div>
+    </div>
+  </main>
+
   <!-- ЭКРАН 2: Чтение истории -->
   <main id="screen-reader" class="screen hidden">
     <button class="back-btn" id="readerBackBtn" onclick="goHome()">← К списку историй</button>
@@ -302,11 +375,13 @@
   <script src="js/ink.js"></script>
 <script src="js/srs-core.js"></script>
 <script src="js/words-core.js"></script>
+<script src="js/games-core.js"></script>
 <script src="js/word-index.js"></script>
   <script src="js/srs.js"></script>
   <script src="js/hifz.js"></script>
   <script src="js/dashboard.js"></script>
   <script src="js/routes.js"></script>
   <script src="js/app.js"></script>
+<script src="js/games.js"></script>
 </body>
 </html>

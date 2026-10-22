@@ -20,7 +20,7 @@ const MODES = {
     id: 'arabic',
     title: 'Арабский язык',
     subtitle: 'Хуна Арабия · диалоги · лексика',
-    sections: ['home', 'review', 'huna1', 'huna2', 'words', 'grammar'],
+    sections: ['home', 'review', 'huna1', 'huna2', 'words', 'games', 'grammar'],
     types: ['huna1', 'huna2']
   }
 };

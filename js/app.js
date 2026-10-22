@@ -288,10 +288,11 @@ function switchTo(section) {
   clearAdvance(); // останавливаем авто-переход тренажёра при смене раздела
   stopPlayer(); // плеер читалки: пауза + сброс UI
   stopAllAudio(); // один аудиопоток: глушим слово, Хифз и свою запись
+  if (section !== 'games' && typeof GAMES !== 'undefined') GAMES.stop(); // игра не должна тикать в фоне
   clearPlayingHighlight();
   closeWordCard();
   stopRecordingIfActive(); // останавливаем запись голоса при уходе
-  ['screen-home', 'screen-routes', 'screen-list', 'screen-hadith', 'screen-stories', 'screen-adhkar', 'screen-study', 'screen-review', 'screen-hifz', 'screen-huna1', 'screen-huna2', 'screen-words', 'screen-grammar', 'screen-grammar-note', 'screen-reader'].forEach(id => {
+  ['screen-home', 'screen-routes', 'screen-list', 'screen-hadith', 'screen-stories', 'screen-adhkar', 'screen-study', 'screen-review', 'screen-hifz', 'screen-huna1', 'screen-huna2', 'screen-words', 'screen-games', 'screen-grammar', 'screen-grammar-note', 'screen-reader'].forEach(id => {
     document.getElementById(id).classList.add('hidden');
   });
   const screenMap = {
@@ -307,6 +308,7 @@ function switchTo(section) {
     huna1: 'screen-huna1',
     huna2: 'screen-huna2',
     words: 'screen-words',
+    games: 'screen-games',
     grammar: 'screen-grammar'
   };
   document.getElementById(screenMap[section]).classList.remove('hidden');
@@ -318,6 +320,7 @@ function switchTo(section) {
   if (section === 'quran' || section === 'hadith' || section === 'stories' || section === 'adhkar') renderStoryList(section);
   if (section === 'huna1' || section === 'huna2') renderBookList(section);
   if (section === 'words') renderWordsScreen();
+  if (section === 'games') { if (typeof GAMES !== 'undefined') GAMES.render(); }
   if (section === 'grammar') renderGrammarList();
   if (section === 'study') populateStudySources();
   if (section === 'review' && typeof SRS !== 'undefined') SRS.renderScreen();
@@ -339,7 +342,7 @@ function openStory(storyId) {
   renderStory(story);
   // прячем ВСЕ экраны (openStory вызывается и с «Маршрутов», и с «Главной»,
   // где screen-list/screen-hadith не единственные возможные)
-  ['screen-home', 'screen-routes', 'screen-list', 'screen-hadith', 'screen-stories', 'screen-adhkar', 'screen-study', 'screen-review', 'screen-hifz', 'screen-huna1', 'screen-huna2', 'screen-words', 'screen-grammar', 'screen-grammar-note', 'screen-reader'].forEach(id => {
+  ['screen-home', 'screen-routes', 'screen-list', 'screen-hadith', 'screen-stories', 'screen-adhkar', 'screen-study', 'screen-review', 'screen-hifz', 'screen-huna1', 'screen-huna2', 'screen-words', 'screen-games', 'screen-grammar', 'screen-grammar-note', 'screen-reader'].forEach(id => {
     document.getElementById(id).classList.add('hidden');
   });
   document.getElementById('screen-reader').classList.remove('hidden');
@@ -1105,6 +1108,24 @@ function renderReaderStudy(story) {
   btn.textContent = label;
   btn.addEventListener('click', () => studyStory(story.id));
   box.appendChild(btn);
+
+  // Контекстный запуск игры по словам этой главы (только «Хуна Арабия»)
+  if (story.chapterId && typeof GAMES !== 'undefined') {
+    const play = document.createElement('button');
+    play.type = 'button';
+    play.className = 'ctrl-btn reader-study-btn';
+    play.textContent = '🃏 Играть с этими словами';
+    play.addEventListener('click', () => openGameForChapter(story.chapterId));
+    box.appendChild(play);
+  }
+}
+
+/** Открыть «Мемори+» по словам главы (вход из читалки). */
+function openGameForChapter(chapterId) {
+  switchTo('games');
+  const sel = document.getElementById('memSource');
+  if (sel) sel.value = 'chapter:' + chapterId;
+  if (typeof renderMemoryRecord === 'function') renderMemoryRecord();
 }
 
 /** Перейти в тренажёр «Изучение слов» и сразу начать по указанному тексту. */
@@ -2890,6 +2911,18 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   document.getElementById('studyStartBtn').addEventListener('click', startStudy);
   document.getElementById('studyExitBtn').addEventListener('click', backToStudySetup);
+
+  // Игры («Мемори+»)
+  const memStartBtn = document.getElementById('memStart');
+  if (memStartBtn) memStartBtn.addEventListener('click', () => { if (typeof GAMES !== 'undefined') GAMES.start(); });
+  const memQuitBtn = document.getElementById('memQuit');
+  if (memQuitBtn) memQuitBtn.addEventListener('click', () => memQuit());
+  const recallClearBtn = document.getElementById('recallClear');
+  if (recallClearBtn) recallClearBtn.addEventListener('click', () => memClearLetters());
+  ['memMode', 'memSize'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('change', () => renderMemoryRecord());
+  });
 
   // Режимы огласовок (только визуальная копия, данные не меняются)
   document.querySelectorAll('#harakatControls button[data-h]').forEach(btn => {
