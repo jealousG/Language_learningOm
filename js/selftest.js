@@ -630,6 +630,26 @@
     record(clozQs.every(q => q.sentence && q.gapIndex >= 0 && q.gapIndex < q.sentence.words.length),
       'Клоуз: пропуск указывает на слово в предложении');
     record(clozQs.every(q => !!q.ru), 'Клоуз: у пропущенного слова есть перевод');
+
+    // ------------------- Словарь главы в тренажёре -------------------
+    if (typeof chapterVocabItems === 'function' && typeof HUNA_DATA !== 'undefined') {
+      const ch = HUNA_DATA.books[0].chapters[0];
+      const vocab = chapterVocabItems(ch.id, new Set());
+      record(Array.isArray(vocab), 'Глава: словарные слова возвращаются тренажёру');
+      record(vocab.every(it => it.word && it.word.w && it.word.ru),
+        'Глава: словарные слова пригодны для тренажёра (есть слово и перевод)');
+      record(vocab.every(it => it.sentence === null && it.gapIndex === 0),
+        'Глава: у словарных слов нет предложения — контекстные задания им не достанутся');
+      const allKeys = new Set(chapterWordEntries(ch, {}, {}, 5, null).map(e => e.key));
+      eq('Глава: если все слова уже в текстах — добавок нет',
+        chapterVocabItems(ch.id, allKeys).length, 0);
+      const skipSome = chapterVocabItems(ch.id, new Set());
+      if (skipSome.length) {
+        const skipOne = new Set([chapterWordEntries(ch, {}, {}, 5, null).find(e => e.key).key]);
+        record(chapterVocabItems(ch.id, skipOne).length < skipSome.length,
+          'Глава: исключённые слова не попадают в добавки');
+      }
+    }
   }
 
   // Запуск: сначала синхронные тесты ядра, затем асинхронные тесты хранилища

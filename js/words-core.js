@@ -179,6 +179,33 @@ function chapterWordEntries(ch, stats, cards, lim, ownerMap) {
 }
 
 /**
+ * Слова из словаря главы, которых нет в её текстах (идиомы «إلى اللقاء», «و» и т.п.).
+ * Нужны, чтобы набор тренажёра совпадал с разделом «Слова»: иначе такие слова
+ * навсегда остаются «Не начато», а тренажёр рапортует «Все слова выучены».
+ * Предложения у них нет — тренажёр спросит «слово ↔ перевод» (плюс корень/грамматику).
+ */
+function chapterVocabItems(chapterId, excludeKeys) {
+  if (typeof HUNA_DATA === 'undefined') return [];
+  let ch = null;
+  (HUNA_DATA.books || []).forEach(b => (b.chapters || []).forEach(c => { if (c.id === chapterId) ch = c; }));
+  if (!ch) return [];
+  const stats = (typeof getStudyStats === 'function') ? getStudyStats() : {};
+  const cards = (typeof SRS !== 'undefined' && SRS.getAllCards) ? SRS.getAllCards() : {};
+  const lim = (typeof learnStreak === 'function') ? learnStreak() : 3;
+  const owner = (typeof wordOwnerMap === 'function') ? wordOwnerMap() : null;
+  const skip = excludeKeys || new Set();
+  return chapterWordEntries(ch, stats, cards, lim, owner)
+    .filter(e => e.key && !skip.has(e.key))
+    .filter(e => e.status !== 'learned')
+    .map(e => ({
+      word: { w: e.w, ru: e.ru, tr: e.tr || '', root: e.root || '', pos: e.pos || '' },
+      sentence: null,
+      gapIndex: 0,
+      story: null
+    }));
+}
+
+/**
  * Заметки грамматики, сгруппированные по главам курса («что и когда проходили»).
  * Возвращает [{id, no, tom, titleRu, titleAr, notes}] — главы по возрастанию номера;
  * заметки без главы (tom/chapter = 0) идут последней группой «Общее».

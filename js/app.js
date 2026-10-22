@@ -2289,6 +2289,10 @@ function startStudy() {
   if (!isNew && story.chapterId && typeof wordOwnerMap === 'function') {
     const owner = wordOwnerMap();
     pool = pool.filter(it => owner.get(wordBaseKey(it.word)) === story.chapterId);
+    // + слова из словаря главы, которых нет в её текстах (идиомы, «و» и т.п.):
+    // иначе «Слова» показывают их «Не начато» навсегда, а тренажёр говорит «всё выучено»
+    const inTexts = new Set(uniqueWordItems(story).map(it => wordBaseKey(it.word)));
+    pool = pool.concat(chapterVocabItems(story.chapterId, inTexts));
   }
 
   if (!pool.length) {
