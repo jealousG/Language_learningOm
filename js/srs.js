@@ -109,6 +109,8 @@ const SRS = (() => {
         (st.sentences || []).forEach(sent => {
           (sent.words || []).forEach(w => {
             if (!w || !w.w || map.has(w.w)) return; // одна карточка на одинаковую форму
+            // имена собственные и цифры (числа в формате цифр) не изучаем
+            if (typeof isStudyableWord === 'function' && !isStudyableWord(w)) return;
             const item = { text: w.w, word: w, story: st };
             map.set(w.w, item);
             list.push(item);

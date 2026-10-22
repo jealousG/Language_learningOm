@@ -251,6 +251,9 @@ foreach ($pair in @(@('03 Корни', 'root'), @('00 MOC', 'moc'), @('01 Диа
       $w = if ($wm.Success) { $wm.Groups[1].Value } else { $wcell }
       if (-not (HasArabic $w)) { continue }
       $ex = ExtractTrRu $cells $header
+      # пример-описание из грамматики («определённое (ال)», «неопределённое») — это не
+      # перевод слова: иначе «الصَّلَاةُ» получало «определённое (ال)» вместо «молитва»
+      if ($ex.ru -and ($ex.ru -match 'определённ' -or $ex.ru -match '\(ال\)')) { continue }
       if ($ex.ru) { AddDict $w $ex.tr $ex.ru '' '' 2 }
       elseif ($ex.tr) { AddDict $w $ex.tr '' '' '' 1 }
     }

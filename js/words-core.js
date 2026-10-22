@@ -92,6 +92,24 @@ function baseWord(word) {
 }
 
 /**
+ * Изучаем ли слово (по решению пользователя из повторения и изучения исключены):
+ *  - цифры и ссылки на аяты (числа в формате цифр: «19», «٩٦», «29:8»);
+ *  - имена собственные (pos начинается с «имя собств.»).
+ * В текстах такие токены ОСТАЮТСЯ (склейка words[].w = ar), но в раздел «Слова»,
+ * тренажёр и SRS не попадают.
+ */
+function isStudyableWord(word) {
+  if (!word || !word.w) return false;
+  const w = String(word.w);
+  if (/[\d\u0660-\u0669\u06F0-\u06F9]/.test(w)) return false;   // цифры (арабские и западные)
+  const pos = String(word.pos || '').trim().toLowerCase();
+  if (/^числ/.test(pos)) return false;                           // числительные
+  if (/^ссылка/.test(pos)) return false;                         // «аят 29:8»
+  if (/^имя собств/.test(pos)) return false;                     // имена собственные
+  return true;
+}
+
+/**
  * Карта «основа слова → id главы, где слово встречается ВПЕРВЫЕ».
  * Главы курса идут сквозной нумерацией (1…16 по обоим томам), поэтому слово
  * принадлежит ровно одной главе — в остальных оно уже не «новое».
@@ -103,6 +121,7 @@ function wordOwnerMap(books) {
   chapters.sort((a, b) => ((a.ch.no ?? 0) - (b.ch.no ?? 0)) || (a.bi - b.bi));
   const map = new Map();
   const note = (w, chId) => {
+    if (!isStudyableWord(w)) return;   // имена собственные и цифры главу не занимают
     const k = wordBaseKey(w);
     if (k && !map.has(k)) map.set(k, chId);
   };
@@ -125,6 +144,7 @@ function chapterWordEntries(ch, stats, cards, lim, ownerMap) {
   const map = new Map();
   const add = (w) => {
     if (!w || !w.w) return;
+    if (!isStudyableWord(w)) return;   // имена собственные и цифры в «Слова» не показываем
     const key = wordBaseKey(w);
     if (!key) return;
     const base = wordBase(w);

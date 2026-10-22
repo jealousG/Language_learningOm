@@ -1495,11 +1495,43 @@ function playWordAudio(src, errText) {
   });
 }
 
+// Последовательное проигрывание озвученных реплик (для материалов, озвученных
+// не полностью: плеер не собирается, а значок ▶ должен вести реплики дальше).
+let sentenceChain = null;   // { story, idx }
+
 function stopWordAudio() {
+  sentenceChain = null;   // последовательное проигрывание реплик прерывается
   if (wordAudio) {
     wordAudio.pause();
     wordAudio = null;
   }
+}
+
+/** Проиграть реплику idx и по окончании — следующую озвученную (без плеера). */
+function playSentenceFrom(story, idx) {
+  const sents = (story && story.sentences) || [];
+  if (idx < 0 || idx >= sents.length || !sents[idx] || !sents[idx].audio) {
+    sentenceChain = null;
+    return;
+  }
+  stopAllAudio('word');
+  highlightAyah(idx);
+  const a = new Audio(encodeURI(sents[idx].audio));
+  wordAudio = a;
+  sentenceChain = { story, idx };
+  a.addEventListener('ended', () => {
+    if (wordAudio !== a) return;                 // уже переключили/остановили
+    if (sentenceChain && sentenceChain.idx === idx) playSentenceFrom(story, idx + 1);
+  });
+  a.addEventListener('error', () => {
+    if (wordAudio !== a) return;
+    sentenceChain = null;
+    showPlayerStatus('Не удалось воспроизвести озвучку реплики.', true);
+  });
+  a.play().catch(() => {
+    sentenceChain = null;
+    showPlayerStatus('Не удалось воспроизвести озвучку реплики.', true);
+  });
 }
 
 /**
@@ -1718,10 +1750,9 @@ function loadAyah(idx, offset) {
 
 function playFromAyah(sIdx) {
   closeWordCard();
-  // если плеер не собран (материал озвучен не полностью) — играем только эту реплику
+  // плеер не собран (материал озвучен не полностью) — ведём реплики по порядку
   if (!playlist.length) {
-    const s = (currentStory && currentStory.sentences) ? currentStory.sentences[sIdx] : null;
-    if (s && s.audio) playWordAudio(encodeURI(s.audio), 'Не удалось воспроизвести озвучку.');
+    playSentenceFrom(currentStory, sIdx);
     return;
   }
   // длительности ещё измеряются (starts пуст) — грузим эту реплику напрямую
@@ -1732,6 +1763,23 @@ function playFromAyah(sIdx) {
     return;
   }
   seekToGlobal(starts[sIdx]);
+  playPlayer();
+}
+
+/** Предыдущая / следующая реплика (кнопки плеера). */
+function stepSentence(dir) {
+  const sents = (currentStory && currentStory.sentences) || [];
+  if (!playlist.length) {
+    // материал озвучен не полностью: идём по озвученным репликам
+    let i = sentenceChain ? sentenceChain.idx + dir : (dir > 0 ? -1 : sents.length);
+    for (; i >= 0 && i < sents.length; i += dir) {
+      if (sents[i] && sents[i].audio) { playSentenceFrom(currentStory, i); return; }
+    }
+    return;
+  }
+  const idx = Math.max(0, Math.min(playlist.length - 1, currentAyah + dir));
+  loadAyah(idx, 0);
+  highlightAyah(idx);
   playPlayer();
 }
 
@@ -1822,6 +1870,7 @@ function uniqueWordItems(story) {
   const seen = new Set();
   const items = [];
   story.sentences.forEach(sent => sent.words.forEach((w, i) => {
+    if (typeof isStudyableWord === 'function' && !isStudyableWord(w)) return; // имена/цифры не изучаем
     const key = wordBaseKey(w);
     if (!key || seen.has(key)) return;
     seen.add(key);
@@ -2188,6 +2237,7 @@ function newWordsPool() {
   [...pool]
     .sort((a, b) => (a.chapterNo ?? a.surahNo ?? 9999) - (b.chapterNo ?? b.surahNo ?? 9999))
     .forEach(s => s.sentences.forEach(sent => sent.words.forEach((w, i) => {
+      if (typeof isStudyableWord === 'function' && !isStudyableWord(w)) return; // имена/цифры не изучаем
       if (seen.has(w.w)) return;
       seen.add(w.w);
       if (isWordLearned(w.w)) return;
@@ -2900,15 +2950,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const btnPlay = document.getElementById('btnPlayPause');
   const btnStop = document.getElementById('btnStop');
-  const btnRewind = document.getElementById('btnRewind');
-  const btnForward = document.getElementById('btnForward');
+  const btnPrev = document.getElementById('btnPrev');
+  const btnNext = document.getElementById('btnNext');
   const seekBar = document.getElementById('seekBar');
   const speedSelect = document.getElementById('speedSelect');
 
   btnPlay.addEventListener('click', togglePlayPause);
   btnStop.addEventListener('click', stopPlayer);
-  btnRewind.addEventListener('click', () => seekToGlobal(globalPosition() - 5));
-  btnForward.addEventListener('click', () => seekToGlobal(globalPosition() + 5));
+  if (btnPrev) btnPrev.addEventListener('click', () => stepSentence(-1));
+  if (btnNext) btnNext.addEventListener('click', () => stepSentence(1));
 
   speedSelect.addEventListener('change', () => {
     if (playerAudio) playerAudio.playbackRate = parseFloat(speedSelect.value);
