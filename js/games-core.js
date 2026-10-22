@@ -115,3 +115,8 @@ function gameRecordBetter(prev, next) {
   if (ns !== ps) return ns < ps;
   return (+next.moves || 0) < (+prev.moves || 0);
 }
+
+/** Ключ рекорда: отдельно для источника (том/глава/невыученные), режима и размера. */
+function gameRecordKey(sourceId, mode, size) {
+  return String(sourceId || '*') + '|' + mode + ':' + size;
+}

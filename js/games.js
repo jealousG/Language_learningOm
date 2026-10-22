@@ -6,6 +6,7 @@
  */
 const GAMES_KEY = 'arabic-reader-games-v1';
 const GAMES_RECALL_COUNT = 3;
+const MEM_MISMATCH_MS = 1200;   // сколько держим открытой неверную пару (было 700 мс — слишком быстро)
 
 let MEM = null;          // состояние партии «Мемори»
 let memTimerId = null;
@@ -13,14 +14,23 @@ let memTimerId = null;
 // ------------------------- рекорды и настройки -------------------------
 
 function gameRecords() {
-  try { return JSON.parse(localStorage.getItem(GAMES_KEY)) || {}; } catch (e) { return {}; }
+  try {
+    const rec = JSON.parse(localStorage.getItem(GAMES_KEY)) || {};
+    // старый формат ключей рекордов ('pair:6' без источника) — переносим в общий зачёт
+    if (rec.memory) {
+      let moved = false;
+      Object.keys(rec.memory).forEach(k => {
+        if (k.indexOf('|') < 0) { rec.memory['*|' + k] = rec.memory[k]; delete rec.memory[k]; moved = true; }
+      });
+      if (moved) saveGameRecords(rec);
+    }
+    return rec;
+  } catch (e) { return {}; }
 }
 
 function saveGameRecords(r) {
   try { localStorage.setItem(GAMES_KEY, JSON.stringify(r)); } catch (e) { /* не критично */ }
 }
-
-function gameRecordKey(mode, size) { return mode + ':' + size; }
 
 // ------------------------- источники слов -------------------------
 
@@ -117,15 +127,22 @@ function renderGames() {
   renderMemoryRecord();
 }
 
+/** Рекорд для сочетания «источник + режим + размер» (или общий — из старого формата). */
+function memoryBestRecord(sourceId, mode, size) {
+  const rec = gameRecords();
+  const mem = rec.memory || {};
+  return mem[gameRecordKey(sourceId, mode, size)] || mem['*|' + mode + ':' + size] || null;
+}
+
 function renderMemoryRecord() {
   const el = document.getElementById('memRecord');
   if (!el) return;
-  const rec = gameRecords();
+  const sourceId = (document.getElementById('memSource') || {}).value || '';
   const mode = (document.getElementById('memMode') || {}).value || 'pair';
   const size = (document.getElementById('memSize') || {}).value || '6';
-  const best = (rec.memory || {})[gameRecordKey(mode, size)];
+  const best = memoryBestRecord(sourceId, mode, size);
   el.textContent = best
-    ? 'Рекорд: ' + fmtTime(best.seconds) + ' · ' + best.moves + ' ходов'
+    ? 'Лучшее: ' + fmtTime(best.seconds) + ' · ' + best.moves + ' ' + gameMovesWord(best.moves)
     : 'Рекорда пока нет';
 }
 
@@ -154,6 +171,7 @@ function memStartGame() {
     sourceId: sourceId,
     mode: mode,
     size: actual,
+    best: memoryBestRecord(sourceId, mode, actual),   // лучшее время по этому источнику
     board: board,
     pairs: pairs,
     openIdx: [],
@@ -177,6 +195,7 @@ function memStartGame() {
   document.getElementById('memRecall').classList.add('hidden');
   renderMemoryBoard();
   updateMemoryHud();
+  renderMemoryBest();
   clearInterval(memTimerId);
   memTimerId = setInterval(() => {
     if (!MEM || MEM.done) return;
@@ -262,7 +281,7 @@ function memFlip(idx) {
       });
       MEM.openIdx = [];
       MEM.locked = false;
-    }, 700);
+    }, MEM_MISMATCH_MS);
   }
 }
 
@@ -274,6 +293,20 @@ function updateMemoryHud() {
   if (m) m.textContent = MEM.moves + ' ' + gameMovesWord(MEM.moves);
   const p = document.getElementById('memPairs');
   if (p) p.textContent = MEM.matched + '/' + MEM.size;
+}
+
+/** Показать справа лучшее время по текущему источнику (если уже играли). */
+function renderMemoryBest() {
+  const el = document.getElementById('memBest');
+  if (!el) return;
+  if (MEM && MEM.best) {
+    el.textContent = 'Лучшее здесь: ' + fmtTime(MEM.best.seconds) + ' · ' +
+      MEM.best.moves + ' ' + gameMovesWord(MEM.best.moves);
+    el.classList.remove('hidden');
+  } else {
+    el.textContent = '';
+    el.classList.add('hidden');
+  }
 }
 
 function gameMovesWord(n) {
@@ -379,8 +412,8 @@ function showRecallMsg(text, isError) {
 function memFinish() {
   const rec = gameRecords();
   rec.memory = rec.memory || {};
-  const key = gameRecordKey(MEM.mode, MEM.size);
-  const prev = rec.memory[key];
+  const key = gameRecordKey(MEM.sourceId, MEM.mode, MEM.size);
+  const prev = memoryBestRecord(MEM.sourceId, MEM.mode, MEM.size);
   const result = { seconds: Math.round(MEM.elapsed), moves: MEM.moves, at: Date.now() };
   const isRecord = gameRecordBetter(prev, result);
   if (isRecord) rec.memory[key] = result;
@@ -401,6 +434,7 @@ function memFinish() {
         '<span>закрепление: ' + MEM.recallOk + ' из ' + (MEM.recall.length || 0) + '</span>' +
       '</div>' +
       '<div class="mem-result-ink">+' + MEM.ink + ' чернил</div>' +
+      (prev ? '<div class="mem-result-prev">Прошлое лучшее: ' + fmtTime(prev.seconds) + ' · ' + prev.moves + ' ' + gameMovesWord(prev.moves) + '</div>' : '') +
       '<div class="study-actions" style="justify-content:center">' +
         '<button class="ctrl-btn primary" id="memAgainBtn">Играть ещё</button>' +
         '<button class="ctrl-btn" id="memHubBtn">Другая игра</button>' +

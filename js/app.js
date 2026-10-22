@@ -2919,7 +2919,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (memQuitBtn) memQuitBtn.addEventListener('click', () => memQuit());
   const recallClearBtn = document.getElementById('recallClear');
   if (recallClearBtn) recallClearBtn.addEventListener('click', () => memClearLetters());
-  ['memMode', 'memSize'].forEach(id => {
+  ['memSource', 'memMode', 'memSize'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.addEventListener('change', () => renderMemoryRecord());
   });

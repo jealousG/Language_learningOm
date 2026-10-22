@@ -558,6 +558,13 @@
     record(gameRecordBetter(null, { seconds: 10, moves: 5 }), 'Игры: рекорд — первый результат всегда рекорд');
     record(gameRecordBetter({ seconds: 20, moves: 9 }, { seconds: 10, moves: 12 }), 'Игры: рекорд — по времени');
     record(!gameRecordBetter({ seconds: 10, moves: 8 }, { seconds: 10, moves: 9 }), 'Игры: рекорд — при равном времени по ходам');
+
+    eq('Игры: рекорд отдельный для каждой главы',
+      gameRecordKey('chapter:huna2-g9', 'pair', 6) === gameRecordKey('chapter:huna2-g10', 'pair', 6), false);
+    eq('Игры: ключ рекорда — источник + режим + размер',
+      gameRecordKey('chapter:huna2-g9', 'gap', 8), 'chapter:huna2-g9|gap:8');
+    eq('Игры: без источника — общий ключ',
+      gameRecordKey('', 'pair', 6), '*|pair:6');
   }
 
   // Запуск: сначала синхронные тесты ядра, затем асинхронные тесты хранилища

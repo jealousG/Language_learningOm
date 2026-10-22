@@ -1849,3 +1849,10 @@ summary:focus-visible, [tabindex]:focus-visible {
   .mem-card .mem-front { font-size: 13px; }
   .mem-card .mem-front[dir="rtl"] { font-size: 18px; }
 }
+.mem-head-right { display: flex; align-items: center; gap: 14px; }
+.mem-best { font-size: 13px; opacity: .75; white-space: nowrap; }
+.mem-result-prev { font-size: 13px; opacity: .65; margin-bottom: 14px; }
+@media (max-width: 620px) {
+  .mem-head { flex-wrap: wrap; }
+  .mem-best { white-space: normal; }
+}
