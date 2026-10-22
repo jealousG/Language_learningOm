@@ -120,3 +120,90 @@ function gameRecordBetter(prev, next) {
 function gameRecordKey(sourceId, mode, size) {
   return String(sourceId || '*') + '|' + mode + ':' + size;
 }
+
+// ------------------------- «Корень» -------------------------
+
+/** Ключ корня: «ك ت ب» → «كتب» (пробелы и дефисы убираем, пустой/«—» → ''). */
+function gameRootKey(root) {
+  const r = String(root || '').replace(/[\s\u0640\-—–]/g, '');
+  return (r === '—' || r.length < 2) ? '' : r;
+}
+
+/** Корень для показа: «كتب» → «ك · ت · ب». */
+function gameRootDisplay(key) {
+  return String(key || '').split('').join(' · ');
+}
+
+/**
+ * Семейства корней из элементов [{word, sentence, gapIndex}]:
+ * [{key, words: [{word, ru}]}] — только корни с не менее minSize словами.
+ * Слова группируются по основе (одна лексема — одна карточка).
+ */
+function gameRootFamilies(items, minSize) {
+  const map = new Map();
+  (items || []).forEach(it => {
+    const w = it && it.word;
+    if (!w || !w.w) return;
+    if (typeof isStudyableWord === 'function' && !isStudyableWord(w)) return;
+    const key = gameRootKey(w.root);
+    if (!key) return;
+    const ru = String(w.ru || '').trim();
+    if (!ru) return;
+    if (!map.has(key)) map.set(key, new Map());
+    const fam = map.get(key);
+    const k = (typeof wordBaseKey === 'function') ? wordBaseKey(w) : w.w;
+    if (!fam.has(k)) fam.set(k, { word: w, ru: ru });
+  });
+  const out = [];
+  map.forEach((fam, key) => {
+    const words = [...fam.values()];
+    if (words.length >= (minSize || 2)) out.push({ key: key, words: words });
+  });
+  return out;
+}
+
+/** Вопросы викторины «какой корень у слова»: до count штук. */
+function gameRootQuestions(families, count, rng) {
+  const pool = [];
+  (families || []).forEach(f => f.words.forEach(x => {
+    pool.push({ familyKey: f.key, word: x.word, ru: x.ru });
+  }));
+  return gameShuffle(pool, rng).slice(0, count || 10);
+}
+
+/** Варианты ответа «какой корень»: правильный + чужие корни (по умолчанию 4). */
+function gameRootOptions(correctKey, families, count, rng) {
+  const wanted = Math.max(2, count || 4);
+  const others = (families || []).filter(f => f.key !== correctKey).map(f => f.key);
+  const picked = gameShuffle(others, rng).slice(0, wanted - 1);
+  return gameShuffle([correctKey].concat(picked), rng);
+}
+
+/**
+ * Раунд «собери семейство»: слова нужного корня (right) + слова других корней.
+ * Возвращает {cards: [{text, ru, right}], need}.
+ */
+function gameFamilyRound(family, families, pick, size, rng) {
+  const need = Math.min(pick || 4, (family.words || []).length);
+  const right = gameShuffle(family.words, rng).slice(0, need);
+  const foreign = [];
+  (families || []).forEach(f => {
+    if (f.key === family.key) return;
+    f.words.forEach(x => foreign.push(x));
+  });
+  const wrong = gameShuffle(foreign, rng).slice(0, Math.max(0, (size || 12) - need));
+  const cards = right.map(x => ({ text: x.word.w, ru: x.ru, right: true }))
+    .concat(wrong.map(x => ({ text: x.word.w, ru: x.ru, right: false })));
+  return { cards: gameShuffle(cards, rng), need: need };
+}
+
+/** Лучше ли результат «Корня»: викторина — больше очков (затем меньше времени), семейство — меньше времени. */
+function gameRootBetter(prev, next, mode) {
+  if (!prev) return true;
+  if (!next) return false;
+  if (mode !== 'family') {
+    const ps = +prev.score || 0, ns = +next.score || 0;
+    if (ns !== ps) return ns > ps;
+  }
+  return (+next.seconds || 0) < (+prev.seconds || 0);
+}

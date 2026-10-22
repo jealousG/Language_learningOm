@@ -219,13 +219,28 @@
         </div>
       </div>
 
-      <div class="game-card game-card-soon">
+      <div class="game-card">
         <div class="game-card-head">
           <span class="game-ico" aria-hidden="true">🌱</span>
           <div>
             <h3 class="game-title">Корень</h3>
-            <div class="game-sub">Скоро: семейства корней и «угадай значение по корню»</div>
+            <div class="game-sub">Трёхбуквенный корень — ключ к арабской лексике: «найди корень» (10 слов) или «собери семейство» (3 раунда)</div>
           </div>
+        </div>
+        <div class="game-opts">
+          <label class="game-opt">Источник
+            <select id="rootSource"></select>
+          </label>
+          <label class="game-opt">Режим
+            <select id="rootMode">
+              <option value="quiz">Найди корень слова</option>
+              <option value="family">Собери семейство</option>
+            </select>
+          </label>
+        </div>
+        <div class="game-foot">
+          <span class="game-record" id="rootRecord">Рекорда пока нет</span>
+          <button type="button" class="ctrl-btn primary" id="rootStart">Играть</button>
         </div>
       </div>
     </div>
@@ -255,6 +270,33 @@
       </div>
 
       <div id="memResult" class="mem-result hidden"></div>
+    </div>
+
+    <div id="rootGame" class="memory-game hidden">
+      <div class="mem-head">
+        <div class="mem-hud">
+          <span id="rootTimer">0:00</span><span class="mem-dot">·</span><span id="rootScore">0 из 10</span><span class="mem-dot">·</span><span id="rootProgress">1/10</span>
+        </div>
+        <div class="mem-head-right">
+          <span class="mem-best hidden" id="rootBest"></span>
+          <button type="button" class="ctrl-btn small" id="rootQuit">Выйти</button>
+        </div>
+      </div>
+
+      <div id="rootQuiz" class="root-quiz hidden">
+        <div class="root-word" id="rootWord" dir="rtl"></div>
+        <div class="root-word-ru" id="rootWordRu"></div>
+        <div class="root-options" id="rootOptions"></div>
+        <div class="root-msg" id="rootMsg"></div>
+      </div>
+
+      <div id="rootFamily" class="root-family hidden">
+        <div class="root-family-head">Соберите все слова с корнем <b id="rootFamilyKey" dir="rtl"></b></div>
+        <div class="root-family-grid" id="rootFamilyGrid"></div>
+        <div class="root-msg" id="rootFamilyMsg"></div>
+      </div>
+
+      <div id="rootResult" class="mem-result hidden"></div>
     </div>
   </main>
 

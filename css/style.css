@@ -1856,3 +1856,52 @@ summary:focus-visible, [tabindex]:focus-visible {
   .mem-head { flex-wrap: wrap; }
   .mem-best { white-space: normal; }
 }
+/* ------------------------- Игра «Корень» ------------------------- */
+.root-quiz { max-width: 720px; }
+.root-word {
+  font-family: var(--ar-font); font-size: 44px; line-height: 1.4;
+  text-align: center; margin: 18px 0 4px; color: var(--ink);
+}
+.root-word-ru { text-align: center; font-size: 15px; opacity: .65; margin-bottom: 20px; }
+.root-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.root-option {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 14px; border-radius: 12px;
+  border: 1px solid var(--line); background: var(--card);
+  color: var(--ink); cursor: pointer; font-size: 15px;
+  transition: background .14s ease, border-color .14s ease;
+}
+.root-option:hover { background: var(--paper-deep); }
+.root-option-num {
+  font-size: 11px; opacity: .5; min-width: 14px;
+  font-family: var(--font-ui);
+}
+.root-option-ar { font-family: var(--ar-font); font-size: 22px; letter-spacing: 1px; }
+.root-option.right { border-color: var(--emerald); background: #eaf3ef; }
+.root-option.wrong { border-color: #c0504d; background: #fbf0ef; }
+.root-option.done { cursor: default; }
+
+.root-family-head { font-size: 15px; margin: 16px 0 14px; }
+.root-family-head b { font-family: var(--ar-font); font-size: 24px; letter-spacing: 1px; }
+.root-family-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.root-family-tile {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  min-height: 84px; padding: 10px 8px; border-radius: 12px;
+  border: 1px solid var(--line); background: var(--card);
+  color: var(--ink); cursor: pointer;
+  transition: background .14s ease, border-color .14s ease, transform .14s ease;
+}
+.root-family-tile:hover { transform: translateY(-1px); background: var(--paper-deep); }
+.rft-ar { font-family: var(--ar-font); font-size: 22px; line-height: 1.4; }
+.rft-ru { font-size: 12px; opacity: .6; text-align: center; }
+.root-family-tile.found { border-color: var(--emerald); background: #eaf3ef; cursor: default; }
+.root-family-tile.bad { border-color: #c0504d; background: #fbf0ef; cursor: default; opacity: .75; }
+.root-msg { min-height: 22px; font-size: 13.5px; margin-top: 12px; color: var(--emerald); }
+.root-msg.error { color: #b04a47; }
+
+@media (max-width: 620px) {
+  .root-word { font-size: 34px; }
+  .root-options { grid-template-columns: 1fr; }
+  .root-family-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .rft-ar { font-size: 19px; }
+}

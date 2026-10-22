@@ -6,7 +6,7 @@
  */
 const GAMES_KEY = 'arabic-reader-games-v1';
 const GAMES_RECALL_COUNT = 3;
-const MEM_MISMATCH_MS = 1200;   // сколько держим открытой неверную пару (было 700 мс — слишком быстро)
+const MEM_MISMATCH_MS = 2500;   // сколько держим открытой неверную пару (по просьбе: 2.5 с)
 
 let MEM = null;          // состояние партии «Мемори»
 let memTimerId = null;
@@ -125,6 +125,7 @@ function renderGames() {
   const selSize = document.getElementById('memSize');
   if (selSize && opts.size) selSize.value = String(opts.size);
   renderMemoryRecord();
+  if (typeof renderRootCard === 'function') renderRootCard();
 }
 
 /** Рекорд для сочетания «источник + режим + размер» (или общий — из старого формата). */
@@ -469,6 +470,7 @@ function gamesStop() {
   clearInterval(memTimerId);
   memTimerId = null;
   MEM = null;
+  if (typeof rootStop === 'function') rootStop();
   const game = document.getElementById('memoryGame');
   if (game) game.classList.add('hidden');
   const hub = document.getElementById('gamesHub');
@@ -480,3 +482,336 @@ const GAMES = {
   start: memStartGame,
   stop: gamesStop
 };
+
+// ========================= «Корень» =========================
+
+let ROOT = null;          // состояние партии «Корень»
+let rootTimerId = null;
+const ROOT_QUIZ_COUNT = 10;   // слов в викторине
+const ROOT_ROUNDS = 3;        // раундов «собери семейство»
+
+function rootBestRecord(sourceId, mode) {
+  const map = gameRecords().root || {};
+  return map[sourceId + '|' + mode] || null;
+}
+
+function renderRootCard() {
+  const sel = document.getElementById('rootSource');
+  if (sel && !sel.options.length) {
+    const groups = new Map();
+    gamesSources().forEach(s => {
+      if (!groups.has(s.group)) groups.set(s.group, []);
+      groups.get(s.group).push(s);
+    });
+    groups.forEach((list, gname) => {
+      const grp = document.createElement('optgroup');
+      grp.label = gname;
+      list.forEach(s => {
+        const o = document.createElement('option');
+        o.value = s.id;
+        o.textContent = s.label;
+        grp.appendChild(o);
+      });
+      sel.appendChild(grp);
+    });
+  }
+  const opts = gameRecords().opts || {};
+  if (sel && opts.rootSource) sel.value = opts.rootSource;
+  renderRootRecord();
+}
+
+function rootModeValue() {
+  return (document.getElementById('rootMode') || {}).value || 'quiz';
+}
+
+function renderRootRecord() {
+  const el = document.getElementById('rootRecord');
+  if (!el) return;
+  const sourceId = (document.getElementById('rootSource') || {}).value || '';
+  const mode = rootModeValue();
+  const best = rootBestRecord(sourceId, mode);
+  if (!best) { el.textContent = 'Рекорда пока нет'; return; }
+  el.textContent = mode === 'family'
+    ? 'Лучшее: ' + fmtTime(best.seconds) + ' · ошибок ' + best.mistakes
+    : 'Лучшее: ' + best.score + ' из ' + best.total + ' · ' + fmtTime(best.seconds);
+}
+
+function rootMsg(text, isError) {
+  ['rootMsg', 'rootFamilyMsg'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = text || '';
+    el.classList.toggle('error', !!isError);
+  });
+}
+
+function rootHud() {
+  if (!ROOT) return;
+  const t = document.getElementById('rootTimer');
+  if (t) t.textContent = fmtTime(ROOT.elapsed || ((Date.now() - ROOT.startedAt) / 1000));
+  const s = document.getElementById('rootScore');
+  if (s) s.textContent = ROOT.score + ' из ' + ROOT.total;
+  const p = document.getElementById('rootProgress');
+  if (p) p.textContent = Math.min(ROOT.idx + 1, ROOT.steps || ROOT.total) + '/' + (ROOT.steps || ROOT.total);
+}
+
+function rootBestLine() {
+  const el = document.getElementById('rootBest');
+  if (!el) return;
+  const best = rootBestRecord(
+    (document.getElementById('rootSource') || {}).value || '',
+    rootModeValue()
+  );
+  if (!best) { el.textContent = ''; el.classList.add('hidden'); return; }
+  el.textContent = rootModeValue() === 'family'
+    ? 'Лучшее: ' + fmtTime(best.seconds)
+    : 'Лучшее: ' + best.score + ' из ' + best.total;
+  el.classList.remove('hidden');
+}
+
+function rootStartGame() {
+  const sourceId = (document.getElementById('rootSource') || {}).value || '';
+  const mode = rootModeValue();
+  const families = gameRootFamilies(gamesItems(sourceId), 2);
+  if (families.length < 5) {
+    const el = document.getElementById('rootRecord');
+    if (el) el.textContent = 'В этом источнике слишком мало слов с корнем.';
+    return;
+  }
+  const rec = gameRecords();
+  rec.opts = Object.assign({}, rec.opts || {}, { rootSource: sourceId });
+  saveGameRecords(rec);
+
+  ROOT = {
+    sourceId: sourceId,
+    mode: mode,
+    families: families,
+    score: 0,
+    mistakes: 0,
+    idx: 0,
+    total: 0,
+    ink: 0,
+    section: gamesInkSection(sourceId),
+    startedAt: Date.now(),
+    elapsed: 0,
+    locked: false,
+    famNeed: 0,
+    famFound: 0
+  };
+
+  if (mode === 'family') {
+    let withFamily = families.filter(f => f.words.length >= 3);
+    if (withFamily.length < ROOT_ROUNDS) {
+      // в главе мало корней с 3+ словами — берём корни всего тома
+      const bookId = (sourceId.indexOf('chapter:') === 0)
+        ? 'book:' + sourceId.slice(8).split('-')[0]
+        : sourceId;
+      const wide = gameRootFamilies(gamesItems(bookId), 3);
+      if (wide.length > withFamily.length) { withFamily = wide; ROOT.families = wide; }
+    }
+    ROOT.rounds = gameShuffle(withFamily.length ? withFamily : families).slice(0, ROOT_ROUNDS);
+    ROOT.steps = ROOT.rounds.length;
+    // «очки» в этом режиме — найденные слова
+    ROOT.total = ROOT.rounds.reduce((a, f) => a + Math.min(4, f.words.length), 0);
+  } else {
+    ROOT.questions = gameRootQuestions(families, ROOT_QUIZ_COUNT);
+    ROOT.total = ROOT.questions.length;
+    ROOT.steps = ROOT.questions.length;
+  }
+
+  document.getElementById('gamesHub').classList.add('hidden');
+  document.getElementById('rootGame').classList.remove('hidden');
+  document.getElementById('rootResult').classList.add('hidden');
+  rootBestLine();
+  rootHud();
+  clearInterval(rootTimerId);
+  rootTimerId = setInterval(() => {
+    if (!ROOT) return;
+    ROOT.elapsed = (Date.now() - ROOT.startedAt) / 1000;
+    rootHud();
+  }, 250);
+
+  if (mode === 'family') rootRenderFamily(); else rootRenderQuiz();
+}
+
+// --------- режим «найди корень» ---------
+
+function rootRenderQuiz() {
+  if (!ROOT) return;
+  const q = ROOT.questions[ROOT.idx];
+  if (!q) { rootFinish(); return; }
+  ROOT.locked = false;
+  document.getElementById('rootQuiz').classList.remove('hidden');
+  document.getElementById('rootFamily').classList.add('hidden');
+  document.getElementById('rootResult').classList.add('hidden');
+  const wEl = document.getElementById('rootWord');
+  if (wEl) wEl.textContent = (typeof wordDisplay === 'function') ? wordDisplay(q.word.w) : q.word.w;
+  const ruEl = document.getElementById('rootWordRu');
+  if (ruEl) ruEl.textContent = q.ru;
+
+  const opts = gameRootOptions(q.familyKey, ROOT.families, 4);
+  const box = document.getElementById('rootOptions');
+  box.innerHTML = '';
+  opts.forEach((key, i) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'root-option';
+    b.dataset.root = key;
+    b.innerHTML = '<span class="root-option-num">' + (i + 1) + '</span>' +
+      '<span class="root-option-ar" dir="rtl">' + escapeHtml(gameRootDisplay(key)) + '</span>';
+    b.addEventListener('click', () => rootAnswerQuiz(key, b));
+    box.appendChild(b);
+  });
+  rootMsg('');
+  rootHud();
+}
+
+function rootAnswerQuiz(key, btn) {
+  if (!ROOT || ROOT.locked) return;
+  ROOT.locked = true;
+  const q = ROOT.questions[ROOT.idx];
+  const ok = key === q.familyKey;
+  document.querySelectorAll('#rootOptions .root-option').forEach(b => {
+    b.classList.add('done');
+    if (b.dataset.root === q.familyKey) b.classList.add('right');
+  });
+  if (ok) {
+    btn.classList.add('right');
+    ROOT.score++;
+    ROOT.ink += 2;
+    if (typeof INK !== 'undefined') INK.add(2, ROOT.section);
+    if (typeof logActivity === 'function') logActivity({ reviews: 1, correct: 1, words: 1 });
+    rootMsg('Верно');
+  } else {
+    btn.classList.add('wrong');
+    ROOT.mistakes++;
+    rootMsg('Корень: ' + gameRootDisplay(q.familyKey), true);
+  }
+  rootHud();
+  setTimeout(() => { if (ROOT) { ROOT.idx++; rootRenderQuiz(); } }, ok ? 700 : 1800);
+}
+
+// --------- режим «собери семейство» ---------
+
+function rootRenderFamily() {
+  if (!ROOT) return;
+  const fam = ROOT.rounds[ROOT.idx];
+  if (!fam) { rootFinish(); return; }
+  ROOT.locked = false;
+  ROOT.famNeed = 0;
+  ROOT.famFound = 0;
+  document.getElementById('rootQuiz').classList.add('hidden');
+  document.getElementById('rootFamily').classList.remove('hidden');
+  document.getElementById('rootResult').classList.add('hidden');
+  const keyEl = document.getElementById('rootFamilyKey');
+  if (keyEl) keyEl.textContent = gameRootDisplay(fam.key);
+
+  const rnd = gameFamilyRound(fam, ROOT.families, 4, 12);
+  ROOT.famNeed = rnd.need;
+  const grid = document.getElementById('rootFamilyGrid');
+  grid.innerHTML = '';
+  rnd.cards.forEach(c => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'root-family-tile';
+    const disp = (typeof wordDisplay === 'function') ? wordDisplay(c.text) : c.text;
+    b.innerHTML = '<span class="rft-ar" dir="rtl">' + escapeHtml(disp) + '</span>' +
+      '<span class="rft-ru">' + escapeHtml(c.ru) + '</span>';
+    b.addEventListener('click', () => rootFamilyTap(b, c));
+    grid.appendChild(b);
+  });
+  rootMsg('');
+  rootHud();
+}
+
+function rootFamilyTap(btn, card) {
+  if (!ROOT || ROOT.locked) return;
+  if (btn.classList.contains('found') || btn.classList.contains('bad')) return;
+  if (card.right) {
+    btn.classList.add('found');
+    ROOT.famFound++;
+    ROOT.score++;
+    ROOT.ink += 2;
+    if (typeof INK !== 'undefined') INK.add(2, ROOT.section);
+    if (typeof logActivity === 'function') logActivity({ reviews: 1, correct: 1, words: 1 });
+    rootHud();
+    if (ROOT.famFound >= ROOT.famNeed) {
+      ROOT.locked = true;
+      ROOT.ink += 5;
+      if (typeof INK !== 'undefined') INK.add(5, ROOT.section);
+      rootMsg('Семейство собрано');
+      setTimeout(() => { if (ROOT) { ROOT.idx++; rootRenderFamily(); } }, 800);
+    }
+  } else {
+    btn.classList.add('bad');
+    ROOT.mistakes++;
+    rootMsg('Это другое семейство', true);
+    rootHud();
+  }
+}
+
+// --------- итог ---------
+
+function rootFinish() {
+  if (!ROOT) return;
+  ROOT.elapsed = (Date.now() - ROOT.startedAt) / 1000;
+  clearInterval(rootTimerId);
+  rootTimerId = null;
+
+  const rec = gameRecords();
+  rec.root = rec.root || {};
+  const key = ROOT.sourceId + '|' + ROOT.mode;
+  const prev = rec.root[key] || null;
+  const result = {
+    score: ROOT.score,
+    total: ROOT.total,
+    mistakes: ROOT.mistakes,
+    seconds: Math.round(ROOT.elapsed),
+    at: Date.now()
+  };
+  const isRecord = gameRootBetter(prev, result, ROOT.mode);
+  if (isRecord) rec.root[key] = result;
+  saveGameRecords(rec);
+  if (typeof logActivity === 'function') logActivity({ trainings: 1 });
+
+  const state = ROOT;
+  ROOT = null;
+  const el = document.getElementById('rootResult');
+  el.classList.remove('hidden');
+  el.innerHTML =
+    '<div class="study-summary">' +
+      '<div class="mem-result-title">' + (isRecord ? 'Новый рекорд!' : 'Партия завершена') + '</div>' +
+      '<div class="mem-result-stats">' +
+        '<span>' + fmtTime(state.elapsed) + '</span>' +
+        '<span>' + state.score + ' из ' + state.total + '</span>' +
+        '<span>ошибок: ' + state.mistakes + '</span>' +
+      '</div>' +
+      '<div class="mem-result-ink">+' + state.ink + ' чернил</div>' +
+      (prev ? '<div class="mem-result-prev">Прошлое лучшее: ' +
+        (state.mode === 'family' ? fmtTime(prev.seconds) : prev.score + ' из ' + prev.total) + '</div>' : '') +
+      '<div class="study-actions" style="justify-content:center">' +
+        '<button class="ctrl-btn primary" id="rootAgainBtn">Играть ещё</button>' +
+        '<button class="ctrl-btn" id="rootHubBtn">Другая игра</button>' +
+      '</div>' +
+    '</div>';
+  document.getElementById('rootAgainBtn').addEventListener('click', rootStartGame);
+  document.getElementById('rootHubBtn').addEventListener('click', rootBackToHub);
+  renderRootRecord();
+}
+
+function rootBackToHub() {
+  clearInterval(rootTimerId);
+  rootTimerId = null;
+  ROOT = null;
+  document.getElementById('rootGame').classList.add('hidden');
+  document.getElementById('gamesHub').classList.remove('hidden');
+  renderGames();
+}
+
+function rootStop() {
+  clearInterval(rootTimerId);
+  rootTimerId = null;
+  ROOT = null;
+  const game = document.getElementById('rootGame');
+  if (game) game.classList.add('hidden');
+}

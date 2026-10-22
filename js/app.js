@@ -2924,6 +2924,16 @@ document.addEventListener('DOMContentLoaded', () => {
     if (el) el.addEventListener('change', () => renderMemoryRecord());
   });
 
+  // Игры («Корень»)
+  const rootStartBtn = document.getElementById('rootStart');
+  if (rootStartBtn) rootStartBtn.addEventListener('click', () => { if (typeof rootStartGame === 'function') rootStartGame(); });
+  const rootQuitBtn = document.getElementById('rootQuit');
+  if (rootQuitBtn) rootQuitBtn.addEventListener('click', () => { if (typeof rootBackToHub === 'function') rootBackToHub(); });
+  ['rootSource', 'rootMode'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('change', () => { if (typeof renderRootRecord === 'function') renderRootRecord(); });
+  });
+
   // Режимы огласовок (только визуальная копия, данные не меняются)
   document.querySelectorAll('#harakatControls button[data-h]').forEach(btn => {
     btn.addEventListener('click', () => setHarakatMode(btn.dataset.h));

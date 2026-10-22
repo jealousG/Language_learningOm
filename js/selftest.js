@@ -565,6 +565,49 @@
       gameRecordKey('chapter:huna2-g9', 'gap', 8), 'chapter:huna2-g9|gap:8');
     eq('Игры: без источника — общий ключ',
       gameRecordKey('', 'pair', 6), '*|pair:6');
+
+    // ------------------- «Корень» -------------------
+    eq('Корень: ключ из «ك ت ب»', gameRootKey('ك ت ب'), 'كتب');
+    eq('Корень: пустой/«—» — нет корня', gameRootKey('—') + '|' + gameRootKey(''), '|');
+    eq('Корень: показ по буквам', gameRootDisplay('كتب'), 'ك · ت · ب');
+
+    const famItems = [
+      { word: { w: 'كَتَبَ', ru: 'писать', root: 'ك ت ب' } },
+      { word: { w: 'كِتَاب', ru: 'книга', root: 'ك ت ب' } },
+      { word: { w: 'مَكْتَب', ru: 'стол', root: 'ك ت ب' } },
+      { word: { w: 'قَلَم', ru: 'ручка', root: 'ق ل م' } },
+      { word: { w: 'قَالَ', ru: 'говорить', root: 'ق و ل' } },
+      { word: { w: 'الله', ru: 'Аллах', root: 'أ ل ه', pos: 'имя собств.' } },
+      { word: { w: 'بِلَا', ru: 'без', root: '' } }
+    ];
+    const fams = gameRootFamilies(famItems, 2);
+    eq('Корень: семейства с ≥2 словами', fams.length, 1);
+    eq('Корень: в семействе только слова этого корня', fams[0].key, 'كتب');
+    eq('Корень: размер семейства', fams[0].words.length, 3);
+
+    const opts = gameRootOptions('كتب', fams.concat([{ key: 'قلم', words: [] }, { key: 'قول', words: [] }, { key: 'علم', words: [] }]), 4);
+    eq('Корень: четыре варианта', opts.length, 4);
+    record(opts.indexOf('كتب') >= 0, 'Корень: правильный вариант среди ответов');
+    eq('Корень: варианты без повторов', new Set(opts).size, 4);
+
+    const qs = gameRootQuestions(fams, 10);
+    eq('Корень: вопросов не больше, чем слов', qs.length, 3);
+
+    const round = gameFamilyRound(
+      { key: 'كتب', words: fams[0].words },
+      fams.concat([{ key: 'قلم', words: [{ word: { w: 'قَلَم' }, ru: 'ручка' }] }, { key: 'قول', words: [{ word: { w: 'قَالَ' }, ru: 'говорить' }] }]),
+      4, 12
+    );
+    eq('Корень: в раунде нужно не больше 4 слов', round.need, 3);
+    record(round.cards.length <= 12 && round.cards.length >= round.need,
+      'Корень: карточек в раунде — от need до 12', round.cards.length);
+    eq('Корень: правильных карточек в раунде', round.cards.filter(c => c.right).length, 3);
+
+    record(gameRootBetter(null, { score: 1, seconds: 30 }, 'quiz'), 'Корень: первый результат — рекорд');
+    record(gameRootBetter({ score: 5, seconds: 30 }, { score: 8, seconds: 40 }, 'quiz'), 'Корень: викторина — больше очков лучше');
+    record(!gameRootBetter({ score: 8, seconds: 30 }, { score: 5, seconds: 10 }, 'quiz'), 'Корень: меньше очков — не рекорд');
+    record(gameRootBetter({ score: 8, seconds: 40 }, { score: 8, seconds: 25 }, 'quiz'), 'Корень: при равных очках — быстрее лучше');
+    record(gameRootBetter({ mistakes: 1, seconds: 40 }, { mistakes: 3, seconds: 25 }, 'family'), 'Корень: семейство — по времени');
   }
 
   // Запуск: сначала синхронные тесты ядра, затем асинхронные тесты хранилища
